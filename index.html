@@ -11,7 +11,10 @@
 <body>
 <div class="app">
     <header class="header">
-        <h1 class="logo">LABY</h1>
+        <div class="brand">
+            <span class="brand-kicker">ZX-81 LAB UNIT</span>
+            <h1 class="logo">LABY</h1>
+        </div>
         <div class="stats">
             <div class="stat">
                 <span class="stat-label">Moves</span>
@@ -30,11 +33,11 @@
                 <span class="stat-value" id="enemies">0</span>
             </div>
             <div class="stat">
-                <span class="stat-label">Size</span>
+                <span class="stat-label">Map</span>
                 <span class="stat-value" id="size">—</span>
             </div>
         </div>
-        <span class="help-hint">F1 Help</span>
+        <span class="help-hint">F1</span>
     </header>
 
     <div class="effects-bar" id="effects-bar"></div>
@@ -49,21 +52,21 @@
 
         <div id="win-overlay" class="win-overlay hidden">
             <div class="win-card">
-                <div class="win-emoji">🏆</div>
-                <h2>Congratulations!</h2>
-                <p>You solved the maze in <strong id="win-moves">0</strong> moves</p>
+                <div class="status-mark">WIN</div>
+                <h2>Exit located</h2>
+                <p>Maze solved in <strong id="win-moves">0</strong> moves</p>
                 <p>Score: <strong id="win-score">0</strong></p>
-                <button class="btn btn-primary" id="btn-new-after-win">New Maze</button>
+                <button class="btn btn-primary" id="btn-new-after-win">New maze</button>
             </div>
         </div>
 
         <div id="death-overlay" class="death-overlay hidden">
             <div class="death-card">
-                <div class="death-emoji">💀</div>
-                <h2>Game Over</h2>
-                <p>The enemy caught you after <strong id="death-moves">0</strong> moves</p>
+                <div class="status-mark">FAIL</div>
+                <h2>Signal lost</h2>
+                <p>Enemy contact after <strong id="death-moves">0</strong> moves</p>
                 <p>Score: <strong id="death-score">0</strong></p>
-                <button class="btn btn-primary" id="btn-new-after-death">Try Again</button>
+                <button class="btn btn-primary" id="btn-new-after-death">Try again</button>
             </div>
         </div>
     </main>
@@ -72,19 +75,20 @@
 <div id="difficulty-modal" class="modal">
     <div class="modal-backdrop"></div>
     <div class="modal-card difficulty-card">
-        <h2>Select Difficulty</h2>
+        <span class="modal-code">BOOT / DIFFICULTY</span>
+        <h2>Select mode</h2>
         <div class="difficulty-options">
             <button class="btn btn-difficulty" data-diff="easy">
                 <span class="diff-name">EASY</span>
-                <span class="diff-desc">Enemies chase every 10 ticks</span>
+                <span class="diff-desc">chase every 10 ticks</span>
             </button>
             <button class="btn btn-difficulty" data-diff="medium">
                 <span class="diff-name">MEDIUM</span>
-                <span class="diff-desc">Enemies chase every 9 ticks</span>
+                <span class="diff-desc">chase every 9 ticks</span>
             </button>
             <button class="btn btn-difficulty" data-diff="hard">
                 <span class="diff-name">HARD</span>
-                <span class="diff-desc">Enemies chase every 8 ticks, more enemies</span>
+                <span class="diff-desc">8 ticks, more enemies</span>
             </button>
         </div>
     </div>
@@ -93,13 +97,14 @@
 <div id="settings-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-card">
-        <h2>New Maze Settings</h2>
+        <span class="modal-code">REBUILD / MAZE</span>
+        <h2>New maze</h2>
         <label>
-            Width <span class="hint">(odd, min 7)</span>
+            Width <span class="hint">(odd, minimum 7)</span>
             <input type="number" id="input-width" value="71" min="7" max="201" step="2">
         </label>
         <label>
-            Height <span class="hint">(odd, min 7)</span>
+            Height <span class="hint">(odd, minimum 7)</span>
             <input type="number" id="input-height" value="41" min="7" max="201" step="2">
         </label>
         <div class="modal-actions">
@@ -112,30 +117,31 @@
 <div id="help-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-card help-card">
+        <span class="modal-code">MANUAL / F1</span>
         <h2>Help</h2>
         <div class="help-section">
             <h3>Controls</h3>
-            <div class="help-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — Move</div>
-            <div class="help-row"><kbd>R</kbd> — New maze</div>
+            <div class="help-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — move</div>
+            <div class="help-row"><kbd>R</kbd> — new maze</div>
 
         </div>
         <div class="help-section">
             <h3>Powerups</h3>
-            <div class="help-row"><span class="pu-icon pu-vision">◉</span> <strong>Vision</strong> — Larger visibility radius (15 moves)</div>
-            <div class="help-row"><span class="pu-icon pu-freeze">✱</span> <strong>Freeze</strong> — Freezes enemies (12 moves)</div>
-            <div class="help-row"><span class="pu-icon pu-xray">Ω</span> <strong>X-Ray</strong> — Instantly reveals 9x9 area around you</div>
-            <div class="help-row"><span class="pu-icon pu-bonus">★</span> <strong>Bonus</strong> — +100 points</div>
-            <div class="help-row"><span class="pu-icon pu-away">⇐</span> <strong>Away</strong> — Enemies flee from you (5 ticks)</div>
+            <div class="help-row"><span class="pu-icon pu-vision">◉</span> <strong>Vision</strong> — larger visibility for 15 moves</div>
+            <div class="help-row"><span class="pu-icon pu-freeze">✱</span> <strong>Freeze</strong> — stops enemies for 12 moves</div>
+            <div class="help-row"><span class="pu-icon pu-xray">Ω</span> <strong>X-Ray</strong> — reveal a 9x9 area</div>
+            <div class="help-row"><span class="pu-icon pu-bonus">★</span> <strong>Bonus</strong> — plus 100 points</div>
+            <div class="help-row"><span class="pu-icon pu-away">⇐</span> <strong>Away</strong> — enemies retreat for 5 ticks</div>
         </div>
         <div class="help-section">
             <h3>Scoring</h3>
-            <div class="help-row">+10 pts for each new cell visited</div>
-            <div class="help-row">+100 pts for <span class="pu-icon pu-bonus">★</span> bonus pickup</div>
+            <div class="help-row">+10 for each new cell visited</div>
+            <div class="help-row">+100 for a <span class="pu-icon pu-bonus">★</span> bonus pickup</div>
         </div>
         <div class="help-section">
             <h3>Goal</h3>
-            <div class="help-row">Navigate the scrolling maze to reach the exit.</div>
-            <div class="help-row">Avoid red enemies! They patrol their zones.</div>
+            <div class="help-row">Reach the exit in the lower-right sector.</div>
+            <div class="help-row">Red patrol zones are dangerous.</div>
         </div>
         <div class="modal-actions">
             <button class="btn btn-primary" id="btn-help-close">Resume</button>
