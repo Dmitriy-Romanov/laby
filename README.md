@@ -178,3 +178,9 @@ Default maze: 71 x 41
 ## GitHub
 
 This project is a pure static app and is safe to keep in a private GitHub repository. If publishing later, GitHub Pages can serve it directly from the repo root or a `docs/` folder.
+
+## Roadmap Notes
+
+- Research current no-hosting publishing platforms for small web games/apps. The target is a simple online version without maintaining a server.
+- Explore a Telegram Mini App version through a bot. Prior experience exists with a home-server setup; the next version should use more reliable hosting/deployment. Implementation notes will be added after the Telegram instructions are provided.
+- If mobile becomes a target, redesign controls for touch input instead of only adapting the desktop keyboard flow.
