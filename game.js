@@ -41,6 +41,12 @@
         return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0').toUpperCase();
     }
 
+    function clampMazeSide(value, fallback) {
+        const n = parseInt(value, 10);
+        if (!Number.isFinite(n)) return fallback;
+        return Math.max(7, Math.min(MAX_CUSTOM_SIDE, n));
+    }
+
     function seedHash(seed) {
         let h = 2166136261;
         for (let i = 0; i < seed.length; i++) {
@@ -134,6 +140,40 @@
         }
     }
 
+    function cellDistance(a, b) {
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+    function spreadDistance(totalCells, count, minDistance) {
+        if (count <= 1) return 0;
+        return Math.max(minDistance, Math.floor(Math.sqrt(totalCells / count) * 0.55));
+    }
+
+    function selectSpreadCells(candidates, count, minDistance, blockers = []) {
+        const picked = [];
+        let distance = minDistance;
+
+        while (picked.length < count && distance >= 0) {
+            picked.length = 0;
+            for (const c of candidates) {
+                if (picked.length >= count) break;
+                const farFromPicked = picked.every(p => cellDistance(c, p) >= distance);
+                const farFromBlockers = blockers.every(p => cellDistance(c, p) >= Math.min(distance, minDistance));
+                if (farFromPicked && farFromBlockers) picked.push(c);
+            }
+            distance -= 2;
+        }
+
+        if (picked.length < count) {
+            for (const c of candidates) {
+                if (picked.length >= count) break;
+                if (!picked.some(p => p.x === c.x && p.y === c.y)) picked.push(c);
+            }
+        }
+
+        return picked.slice(0, count);
+    }
+
     // ─── Game State ────────────────────────────────────────────────────────
     const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'penalty', 'away'];
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
@@ -141,17 +181,30 @@
     const PENALTY_POINTS = 50;
     const CELL_POINTS = 10;
     const REVISIT_PENALTY = 1;
+    const START_LIVES = 5;
+    const HIT_RESPAWN_MS = 5000;
+    const HIT_INVULNERABLE_MS = 900;
     const ENEMY_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
     const FORGET_THRESHOLD = 10;
-    const EXTRA_PATH_DENSITY = 40;
+    const PERMA_VISIBLE = 255;
+    const TORCH_RADIUS = 4;
+    const TORCH_EDGE_MARGIN = TORCH_RADIUS + 2;
+    const MAX_CUSTOM_SIDE = 151;
+    const EXTRA_PATH_DENSITY = 32;
     const PU_DENSITY = 100;
     const KEY_DENSITY = 800;
     const HUNTER_DENSITY = 800;
     const DIFFICULTY = {
+        beginner: {width: 71, height: 41, enemyDensity: 0, chaseEvery: 0, hunterChaseEvery: 0, enemies: false},
         easy:   {width: 71, height: 41, enemyDensity: 800, chaseEvery: 10, hunterChaseEvery: 8},
         medium: {width: 81, height: 51, enemyDensity: 700, chaseEvery: 9, hunterChaseEvery: 7},
         hard:   {width: 91, height: 61, enemyDensity: 600, chaseEvery: 8, hunterChaseEvery: 6},
     };
+    const SCORE_STORAGE_KEY = 'laby.highScores.v1';
+    const DEBUG_SNAPSHOT_KEY = 'laby.debugSnapshot.v1';
+    const SCORE_LEVELS = ['easy', 'medium', 'hard'];
+    const SCORE_LIMIT = 5;
+    const SCORE_NAME_LIMIT = 7;
     let difficulty = 'easy';
     let currentSeed = makeSeed();
 
@@ -159,12 +212,13 @@
         const maze = generateMaze(width, height);
         const totalCells = maze.w * maze.h;
         const cfg = DIFFICULTY[difficulty];
-        const enemyCount = Math.max(1, Math.floor(totalCells / cfg.enemyDensity));
-        const hunterCount = Math.max(1, Math.floor(totalCells / HUNTER_DENSITY));
-        const enemies = [
-            ...placeEnemies(maze, enemyCount, 'patrol', 3, cfg.chaseEvery, []),
-        ];
-        enemies.push(...placeEnemies(maze, hunterCount, 'hunter', 2, cfg.hunterChaseEvery, enemies));
+        const enemies = [];
+        if (cfg.enemies !== false) {
+            const enemyCount = Math.max(1, Math.floor(totalCells / cfg.enemyDensity));
+            const hunterCount = Math.max(1, Math.floor(totalCells / HUNTER_DENSITY));
+            enemies.push(...placeEnemies(maze, enemyCount, 'patrol', 3, cfg.chaseEvery, []));
+            enemies.push(...placeEnemies(maze, hunterCount, 'hunter', 2, cfg.hunterChaseEvery, enemies));
+        }
 
         const state = {
             maze,
@@ -173,6 +227,8 @@
             py: maze.startPos.y,
             moveCount: 0,
             score: 0,
+            lives: START_LIVES,
+            invulnerableUntil: 0,
             won: false,
             dead: false,
             enemies,
@@ -182,8 +238,8 @@
             totalKeys: Math.max(1, Math.floor(totalCells / KEY_DENSITY)),
             collectedKeys: 0,
             powerups: [],
+            torches: [],
             effects: {},
-            keyScanUntil: 0,
             footprints: new Set(),
             visited: new Set(),
             camX: 0,
@@ -216,9 +272,11 @@
     }
 
     function canPlaceEnemy(enemies, idx, candidate) {
+        const now = Date.now();
         const rect = enemyRect(candidate);
         for (let i = 0; i < enemies.length; i++) {
             if (i === idx) continue;
+            if (enemies[i].inactiveUntil && enemies[i].inactiveUntil > now) continue;
             if (rectsOverlap(rect, enemyRect(enemies[i]), 1)) return false;
         }
         return true;
@@ -255,6 +313,7 @@
                 dir: Math.floor(rng() * ENEMY_DIRS.length),
                 ticks: 0,
                 chaseEvery,
+                inactiveUntil: 0,
                 minX: xS,
                 maxX: Math.min(xE, maze.w) - size,
                 minY: 0,
@@ -276,8 +335,11 @@
             }
         }
         shuffleArray(candidates);
-        for (let i = 0; i < Math.min(state.totalKeys, candidates.length); i++) {
-            state.keys.push({x: candidates[i].x, y: candidates[i].y, collected: false});
+        const keyCount = Math.min(state.totalKeys, candidates.length);
+        const keyDistance = spreadDistance(m.w * m.h, keyCount, 14);
+        const cells = selectSpreadCells(candidates, keyCount, keyDistance);
+        for (const c of cells) {
+            state.keys.push({x: c.x, y: c.y, collected: false});
         }
         state.totalKeys = state.keys.length;
     }
@@ -297,13 +359,35 @@
         shuffleArray(candidates);
         const count = Math.min(Math.floor((m.w * m.h) / PU_DENSITY), candidates.length);
         const scanCount = Math.min(state.totalKeys * 2, count);
+        const powerupDistance = spreadDistance(m.w * m.h, count, 6);
+        const scanCells = selectSpreadCells(candidates, scanCount, powerupDistance, state.keys);
+        const occupied = [...state.keys, ...scanCells];
+        const usedCells = new Set(scanCells.map(c => c.x + ',' + c.y));
+        const remainingCandidates = candidates.filter(c => !usedCells.has(c.x + ',' + c.y));
+        const torchCandidates = remainingCandidates.filter(c =>
+            c.x >= TORCH_EDGE_MARGIN && c.x < m.w - TORCH_EDGE_MARGIN &&
+            c.y >= TORCH_EDGE_MARGIN && c.y < m.h - TORCH_EDGE_MARGIN
+        );
+        const torchCount = Math.min(state.totalKeys + 1, count - scanCount, torchCandidates.length);
+        const torchCells = selectSpreadCells(torchCandidates, torchCount, 12, occupied);
+        torchCells.forEach(c => usedCells.add(c.x + ',' + c.y));
+        const otherCells = selectSpreadCells(
+            candidates.filter(c => !usedCells.has(c.x + ',' + c.y)),
+            count - scanCount - torchCount,
+            powerupDistance,
+            [...occupied, ...torchCells]
+        );
+
         for (let i = 0; i < scanCount; i++) {
-            const c = candidates[i];
+            const c = scanCells[i];
             state.powerups.push({x: c.x, y: c.y, type: 'keyscan'});
         }
-        for (let i = scanCount; i < count; i++) {
-            const c = candidates[i];
-            const ptype = PU_TYPES[(i - scanCount) % PU_TYPES.length];
+        for (const c of torchCells) {
+            state.powerups.push({x: c.x, y: c.y, type: 'torch'});
+        }
+        for (let i = 0; i < otherCells.length; i++) {
+            const c = otherCells[i];
+            const ptype = PU_TYPES[i % PU_TYPES.length];
             state.powerups.push({x: c.x, y: c.y, type: ptype});
         }
         state.totalPowerups = state.powerups.length;
@@ -314,16 +398,57 @@
         return 1;
     }
 
-    function revealAround(state, cx, cy) {
-        const r = effectiveRadius(state);
+    function revealCell(state, x, y) {
+        if (state.revealed[y][x] !== PERMA_VISIBLE) state.revealed[y][x] = state.moveCount;
+    }
+
+    function revealCellPermanent(state, x, y) {
+        state.revealed[y][x] = PERMA_VISIBLE;
+    }
+
+    function revealCirclePermanent(state, cx, cy, r) {
         const m = state.maze;
-        const rev = state.revealed;
+        const r2 = r * r;
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                if (dx * dx + dy * dy > r2) continue;
+                const nx = cx + dx;
+                const ny = cy + dy;
+                if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
+                    revealCellPermanent(state, nx, ny);
+                }
+            }
+        }
+    }
+
+    function revealAroundPermanent(state, cx, cy, r = 1) {
+        const m = state.maze;
         for (let dy = -r; dy <= r; dy++) {
             for (let dx = -r; dx <= r; dx++) {
                 const nx = cx + dx;
                 const ny = cy + dy;
                 if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-                    rev[ny][nx] = state.moveCount;
+                    revealCellPermanent(state, nx, ny);
+                }
+            }
+        }
+    }
+
+    function resetReplayVisibility(state) {
+        for (let y = 0; y < state.maze.h; y++) {
+            state.revealed[y].fill(-1);
+        }
+    }
+
+    function revealAround(state, cx, cy) {
+        const r = effectiveRadius(state);
+        const m = state.maze;
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                const nx = cx + dx;
+                const ny = cy + dy;
+                if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
+                    revealCell(state, nx, ny);
                 }
             }
         }
@@ -335,7 +460,8 @@
         const visible = state.visible;
         for (let y = 0; y < m.h; y++) {
             for (let x = 0; x < m.w; x++) {
-                visible[y][x] = rev[y][x] >= 0 && (state.moveCount - rev[y][x]) <= FORGET_THRESHOLD;
+                visible[y][x] = rev[y][x] === PERMA_VISIBLE ||
+                    (rev[y][x] >= 0 && (state.moveCount - rev[y][x]) <= FORGET_THRESHOLD);
                 if (x === m.exitPos.x && y === m.exitPos.y) visible[y][x] = true;
             }
         }
@@ -345,7 +471,10 @@
     function tickEnemies(state) {
         if (state.won || state.dead || state.effects.freeze) return;
         const fleeing = !!state.effects.away;
+        const now = Date.now();
         for (const e of state.enemies) {
+            if (e.inactiveUntil && e.inactiveUntil > now) continue;
+            if (e.inactiveUntil && e.inactiveUntil <= now) respawnEnemy(state, e);
             e.ticks++;
             if (fleeing) {
                 let bestDir = e.dir;
@@ -388,10 +517,44 @@
         checkEnemyCollisions(state);
     }
 
+    function respawnEnemy(state, enemy) {
+        const candidates = [];
+        const m = state.maze;
+        for (let y = enemy.minY; y <= enemy.maxY; y++) {
+            for (let x = enemy.minX; x <= enemy.maxX; x++) {
+                if (m.grid[y][x] === WALL) continue;
+                const candidate = {...enemy, x, y, inactiveUntil: 0};
+                if (!canPlaceEnemy(state.enemies, state.enemies.indexOf(enemy), candidate)) continue;
+                candidates.push({x, y, dist: Math.abs(x - state.px) + Math.abs(y - state.py)});
+            }
+        }
+        if (!candidates.length) {
+            enemy.inactiveUntil = Date.now() + 1000;
+            return;
+        }
+        candidates.sort((a, b) => b.dist - a.dist);
+        const pick = candidates[Math.floor(rng() * Math.min(8, candidates.length))];
+        enemy.x = pick.x;
+        enemy.y = pick.y;
+        enemy.dir = Math.floor(rng() * ENEMY_DIRS.length);
+        enemy.ticks = 0;
+        enemy.inactiveUntil = 0;
+    }
+
     function checkEnemyCollisions(state) {
+        if (Date.now() < state.invulnerableUntil) return;
         for (const e of state.enemies) {
+            if (e.inactiveUntil && e.inactiveUntil > Date.now()) continue;
             if (e.x <= state.px && state.px < e.x + e.size && e.y <= state.py && state.py < e.y + e.size) {
-                state.dead = true;
+                if (state.lives <= 1) {
+                    state.lives = 0;
+                    state.dead = true;
+                } else {
+                    state.lives--;
+                    state.invulnerableUntil = Date.now() + HIT_INVULNERABLE_MS;
+                    e.inactiveUntil = Date.now() + HIT_RESPAWN_MS;
+                    showCollectPopup('LIFE -1');
+                }
                 return;
             }
         }
@@ -418,10 +581,12 @@
                 } else if (type === 'xray') {
                     revealArea(state, state.px, state.py, 4);
                 } else if (type === 'keyscan') {
-                    state.keyScanUntil = Date.now() + 5000;
-                    setTimeout(() => {
-                        if (state && Date.now() >= state.keyScanUntil) renderMaze();
-                    }, 5050);
+                    state.keys.forEach(key => {
+                        if (!key.collected) revealCellPermanent(state, key.x, key.y);
+                    });
+                } else if (type === 'torch') {
+                    state.torches.push({x: p.x, y: p.y});
+                    revealCirclePermanent(state, p.x, p.y, TORCH_RADIUS);
                 } else {
                     state.effects[type] = PU_DURATIONS[type];
                 }
@@ -446,13 +611,12 @@
 
     function revealArea(state, cx, cy, r) {
         const m = state.maze;
-        const rev = state.revealed;
         for (let dy = -r; dy <= r; dy++) {
             for (let dx = -r; dx <= r; dx++) {
                 const nx = cx + dx;
                 const ny = cy + dy;
                 if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-                    rev[ny][nx] = state.moveCount;
+                    revealCell(state, nx, ny);
                 }
             }
         }
@@ -482,9 +646,9 @@
         return false;
     }
 
-    function updateCamera(state) {
+    function updateCamera(state, focusX = state.px, focusY = state.py) {
         const cs = cellSize();
-        const area = document.querySelector('.game-area');
+        const area = gameAreaEl;
         const availW = area.clientWidth - 4;
         const availH = area.clientHeight - 4;
         const m = state.maze;
@@ -494,14 +658,14 @@
         if (m.w <= viewW) {
             state.camX = 0;
         } else {
-            const targetX = state.px - Math.floor(viewW * 0.4);
+            const targetX = focusX - Math.floor(viewW * 0.4);
             state.camX = Math.max(0, Math.min(targetX, m.w - viewW));
         }
 
         if (m.h <= viewH) {
             state.camY = 0;
         } else {
-            const targetY = state.py - Math.floor(viewH * 0.5);
+            const targetY = focusY - Math.floor(viewH * 0.5);
             state.camY = Math.max(0, Math.min(targetY, m.h - viewH));
         }
     }
@@ -509,12 +673,16 @@
     // ─── DOM Refs ──────────────────────────────────────────────────────────
     const $ = (s) => document.querySelector(s);
     const appEl = $('.app');
+    const gameAreaEl = $('.game-area');
     const mazeEl = $('#maze');
     const playerEl = $('#player');
     const containerEl = $('#maze-container');
+    const trackRunnerEl = $('#track-runner');
+    const minimapEl = $('#minimap');
     const movesEl = $('#moves');
     const sizeEl = $('#size');
     const scoreEl = $('#score');
+    const livesEl = $('#lives');
     const enemiesEl = $('#enemies');
     const powerupsEl = $('#powerups');
     const keysEl = $('#keys');
@@ -525,6 +693,9 @@
     const winMoves = $('#win-moves');
     const deathOverlay = $('#death-overlay');
     const deathMoves = $('#death-moves');
+    const scoresOverlay = $('#scores-overlay');
+    const scoreListEl = $('#score-list');
+    const scoreHelpEl = $('#score-help');
     const settingsModal = $('#settings-modal');
     const helpModal = $('#help-modal');
     const difficultyModal = $('#difficulty-modal');
@@ -537,6 +708,10 @@
     let state = null;
     let paused = false;
     let enemyEls = [];
+    let scoreTables = loadScoreTables();
+    let activeScoreTab = 'easy';
+    let pendingScoreEntry = null;
+    let shortTrackTimer = null;
 
     function setPaused(value) {
         paused = value;
@@ -565,11 +740,363 @@
         }
     }
 
+    function posKey(p) {
+        return p.x + ',' + p.y;
+    }
+
+    function shortestPathBetween(m, from, to) {
+        const start = posKey(from);
+        const target = posKey(to);
+        if (start === target) return [{x: from.x, y: from.y}];
+        const queue = [{x: from.x, y: from.y}];
+        const prev = new Map([[start, null]]);
+        const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+        for (let qi = 0; qi < queue.length; qi++) {
+            const cur = queue[qi];
+            for (const [dx, dy] of dirs) {
+                const nx = cur.x + dx;
+                const ny = cur.y + dy;
+                if (nx < 0 || nx >= m.w || ny < 0 || ny >= m.h) continue;
+                if (m.grid[ny][nx] === WALL) continue;
+                const key = nx + ',' + ny;
+                if (prev.has(key)) continue;
+                prev.set(key, cur.x + ',' + cur.y);
+                if (key === target) {
+                    const path = [{x: nx, y: ny}];
+                    let back = prev.get(key);
+                    while (back) {
+                        const [bx, by] = back.split(',').map(Number);
+                        path.push({x: bx, y: by});
+                        back = prev.get(back);
+                    }
+                    return path.reverse();
+                }
+                queue.push({x: nx, y: ny});
+            }
+        }
+        return [];
+    }
+
+    function concatRouteSegments(points) {
+        const route = [];
+        for (let i = 0; i < points.length - 1; i++) {
+            const segment = shortestPathBetween(state.maze, points[i], points[i + 1]);
+            if (!segment.length) return [];
+            route.push(...(i === 0 ? segment : segment.slice(1)));
+        }
+        return route;
+    }
+
+    function nearestKeyOrder(keys) {
+        const remaining = keys.slice();
+        const order = [];
+        let cur = state.maze.startPos;
+        while (remaining.length) {
+            let bestIndex = 0;
+            let bestPath = null;
+            for (let i = 0; i < remaining.length; i++) {
+                const path = shortestPathBetween(state.maze, cur, remaining[i]);
+                if (!bestPath || path.length < bestPath.length) {
+                    bestPath = path;
+                    bestIndex = i;
+                }
+            }
+            const [next] = remaining.splice(bestIndex, 1);
+            order.push(next);
+            cur = next;
+        }
+        return order;
+    }
+
+    function exactKeyOrder(keys) {
+        const points = [state.maze.startPos, ...keys, state.maze.exitPos];
+        const distances = Array.from({length: points.length}, () => []);
+        for (let i = 0; i < points.length; i++) {
+            for (let j = 0; j < points.length; j++) {
+                if (i === j) distances[i][j] = 0;
+                else distances[i][j] = shortestPathBetween(state.maze, points[i], points[j]).length - 1;
+            }
+        }
+
+        const allMask = (1 << keys.length) - 1;
+        const memo = new Map();
+        function solve(at, mask) {
+            const key = at + ':' + mask;
+            if (memo.has(key)) return memo.get(key);
+            if (mask === allMask) return {cost: distances[at][points.length - 1], order: []};
+            let best = {cost: Infinity, order: []};
+            for (let i = 0; i < keys.length; i++) {
+                if (mask & (1 << i)) continue;
+                const next = i + 1;
+                const tail = solve(next, mask | (1 << i));
+                const cost = distances[at][next] + tail.cost;
+                if (cost < best.cost) best = {cost, order: [keys[i], ...tail.order]};
+            }
+            memo.set(key, best);
+            return best;
+        }
+        return solve(0, 0).order;
+    }
+
+    function buildShortTrackRoute() {
+        const keys = state.keys.map(k => ({x: k.x, y: k.y}));
+        const orderedKeys = keys.length <= 10 ? exactKeyOrder(keys) : nearestKeyOrder(keys);
+        return concatRouteSegments([state.maze.startPos, ...orderedKeys, state.maze.exitPos]);
+    }
+
+    function drawMinimap() {
+        if (!state || !minimapEl) return;
+        const ctx = minimapEl.getContext('2d');
+        const m = state.maze;
+        const w = minimapEl.width;
+        const h = minimapEl.height;
+        const pad = 8;
+        const innerW = w - pad * 2;
+        const innerH = h - pad * 2;
+        const scale = Math.min(innerW / m.w, innerH / m.h);
+        const mapW = Math.max(1, Math.round(m.w * scale));
+        const mapH = Math.max(1, Math.round(m.h * scale));
+        const ox = Math.floor((w - mapW) / 2);
+        const oy = Math.floor((h - mapH) / 2);
+        const cs = cellSize();
+        const area = gameAreaEl;
+        const viewW = Math.min(m.w, Math.floor((area.clientWidth - 4) / cs));
+        const viewH = Math.min(m.h, Math.floor((area.clientHeight - 4) / cs));
+        const viewX = ox + Math.round(state.camX * scale);
+        const viewY = oy + Math.round(state.camY * scale);
+        const viewRectW = Math.max(2, Math.round(viewW * scale));
+        const viewRectH = Math.max(2, Math.round(viewH * scale));
+        const playerX = ox + Math.round((state.px + 0.5) * scale);
+        const playerY = oy + Math.round((state.py + 0.5) * scale);
+        const startX = ox + Math.round((m.startPos.x + 0.5) * scale);
+        const startY = oy + Math.round((m.startPos.y + 0.5) * scale);
+        const exitX = ox + Math.round((m.exitPos.x + 0.5) * scale);
+        const exitY = oy + Math.round((m.exitPos.y + 0.5) * scale);
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(0, 0, 205, 0.28)';
+        ctx.fillRect(ox, oy, mapW, mapH);
+        ctx.strokeStyle = '#00cdcd';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ox + 0.5, oy + 0.5, mapW - 1, mapH - 1);
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(viewX + 0.5, viewY + 0.5, viewRectW, viewRectH);
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(startX - 1, startY - 1, 3, 3);
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(exitX - 2.5, exitY - 2.5, 5, 5);
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(playerX - 2, playerY - 2, 5, 5);
+        ctx.strokeStyle = '#ff0000';
+        ctx.strokeRect(playerX - 2.5, playerY - 2.5, 5, 5);
+    }
+
     function setTransform(el, cacheName, value) {
         if (state[cacheName] !== value) {
             state[cacheName] = value;
             el.style.transform = value;
         }
+    }
+
+    function defaultScoreEntry() {
+        return {name: 'PLAYER', score: 0, moves: 9999, seed: '', date: ''};
+    }
+
+    function defaultScoreTables() {
+        const tables = {};
+        SCORE_LEVELS.forEach(level => {
+            tables[level] = Array.from({length: SCORE_LIMIT}, defaultScoreEntry);
+        });
+        return tables;
+    }
+
+    function normalizeScoreTables(raw) {
+        const defaults = defaultScoreTables();
+        if (!raw || typeof raw !== 'object') return defaults;
+        SCORE_LEVELS.forEach(level => {
+            const rows = Array.isArray(raw[level]) ? raw[level] : [];
+            defaults[level] = rows.slice(0, SCORE_LIMIT).map(row => ({
+                name: String(row.name || 'PLAYER').slice(0, SCORE_NAME_LIMIT).toUpperCase(),
+                score: Math.max(0, parseInt(row.score, 10) || 0),
+                moves: Math.max(0, parseInt(row.moves, 10) || 9999),
+                seed: String(row.seed || ''),
+                date: String(row.date || ''),
+            }));
+            while (defaults[level].length < SCORE_LIMIT) defaults[level].push(defaultScoreEntry());
+        });
+        return defaults;
+    }
+
+    function loadScoreTables() {
+        try {
+            return normalizeScoreTables(JSON.parse(localStorage.getItem(SCORE_STORAGE_KEY)));
+        } catch (e) {
+            return defaultScoreTables();
+        }
+    }
+
+    function saveScoreTables() {
+        try {
+            localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(scoreTables));
+        } catch (e) {}
+    }
+
+    function sortScoreRows(rows) {
+        return rows.slice().sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            if (a.moves !== b.moves) return a.moves - b.moves;
+            return String(b.date || '').localeCompare(String(a.date || ''));
+        });
+    }
+
+    function scoreInsertIndex(level, entry) {
+        if (entry.score <= 0) return -1;
+        const rows = sortScoreRows([...(scoreTables[level] || []), entry]).slice(0, SCORE_LIMIT);
+        return rows.indexOf(entry);
+    }
+
+    function formatScore(value) {
+        return String(value).padStart(4, '0');
+    }
+
+    function scoreNameInputText() {
+        const name = pendingScoreEntry ? pendingScoreEntry.name : '';
+        const padded = (name + '_'.repeat(SCORE_NAME_LIMIT)).slice(0, SCORE_NAME_LIMIT);
+        return padded.slice(0, name.length) + '<span class="score-cursor">_</span>' + padded.slice(name.length + 1);
+    }
+
+    function renderScoreTabs() {
+        document.querySelectorAll('[data-score-tab]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.scoreTab === activeScoreTab);
+        });
+    }
+
+    function renderScoreTable() {
+        renderScoreTabs();
+        const rows = scoreTables[activeScoreTab] || [];
+        scoreListEl.innerHTML = '';
+        rows.forEach((row, index) => {
+            const li = document.createElement('li');
+            const isEntry = pendingScoreEntry && pendingScoreEntry.level === activeScoreTab &&
+                pendingScoreEntry.index === index;
+            li.className = 'score-row' + (isEntry ? ' is-entry' : '');
+            const rank = document.createElement('span');
+            const name = document.createElement('span');
+            const score = document.createElement('span');
+            const moves = document.createElement('span');
+            rank.className = 'score-rank';
+            name.className = 'score-name';
+            score.className = 'score-score';
+            moves.className = 'score-moves';
+            rank.textContent = index + 1;
+            if (isEntry) {
+                name.classList.add('score-input');
+                name.innerHTML = scoreNameInputText();
+            } else {
+                name.textContent = row.name;
+            }
+            score.textContent = formatScore(row.score);
+            moves.textContent = row.score > 0 ? row.moves : '----';
+            li.append(rank, name, score, moves);
+            scoreListEl.appendChild(li);
+        });
+        if (pendingScoreEntry) {
+            scoreHelpEl.textContent = 'Type name, Enter to save';
+        } else {
+            scoreHelpEl.textContent = 'Space: close';
+        }
+    }
+
+    function showScores(level = difficulty) {
+        activeScoreTab = SCORE_LEVELS.includes(level) ? level : 'easy';
+        scoresOverlay.classList.remove('hidden');
+        setPaused(true);
+        renderScoreTable();
+    }
+
+    function closeScores() {
+        if (pendingScoreEntry) {
+            submitScoreName();
+            return;
+        }
+        scoresOverlay.classList.add('hidden');
+        if (!state) {
+            setPaused(false);
+        } else if (!state.dead && !state.won &&
+            helpModal.classList.contains('hidden') && settingsModal.classList.contains('hidden')) {
+            setPaused(false);
+        }
+    }
+
+    function resetScoreTables() {
+        pendingScoreEntry = null;
+        scoreTables = defaultScoreTables();
+        saveScoreTables();
+        showScores(activeScoreTab);
+    }
+
+    function scoreInputChar(e) {
+        if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3);
+        if (/^Digit[0-9]$/.test(e.code)) return e.code.slice(5);
+        if (/^Numpad[0-9]$/.test(e.code)) return e.code.slice(6);
+        if (/^[a-zA-Z0-9]$/.test(e.key)) return e.key.toUpperCase();
+        return '';
+    }
+
+    function handleScoreInput(e) {
+        if (!pendingScoreEntry) return false;
+        if (e.key === 'Enter') {
+            submitScoreName();
+            return true;
+        }
+        if (e.key === 'Backspace') {
+            pendingScoreEntry.name = pendingScoreEntry.name.slice(0, -1);
+            renderScoreTable();
+            return true;
+        }
+        const char = scoreInputChar(e);
+        if (char && pendingScoreEntry.name.length < SCORE_NAME_LIMIT) {
+            pendingScoreEntry.name += char;
+            renderScoreTable();
+            return true;
+        }
+        return true;
+    }
+
+    function submitScoreName() {
+        if (!pendingScoreEntry) return;
+        const entry = pendingScoreEntry.entry;
+        entry.name = pendingScoreEntry.name || 'PLAYER';
+        scoreTables[pendingScoreEntry.level][pendingScoreEntry.index] = entry;
+        pendingScoreEntry = null;
+        saveScoreTables();
+        renderScoreTable();
+    }
+
+    function recordRunScore(result) {
+        if (!SCORE_LEVELS.includes(difficulty)) return;
+        const level = SCORE_LEVELS.includes(difficulty) ? difficulty : 'easy';
+        const entry = {
+            name: '',
+            score: state.score,
+            moves: state.moveCount,
+            seed: state.seed,
+            date: new Date().toISOString(),
+            result,
+        };
+        const index = scoreInsertIndex(level, entry);
+        if (index >= 0) {
+            const rows = sortScoreRows([...(scoreTables[level] || []), entry]).slice(0, SCORE_LIMIT);
+            scoreTables[level] = rows;
+            pendingScoreEntry = {level, index, entry, name: ''};
+        } else {
+            pendingScoreEntry = null;
+        }
+        showScores(level);
     }
 
     // ─── Build & Render ─────────────────────────────────────────────────
@@ -608,7 +1135,7 @@
         }
     }
 
-    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', away: 'REPEL', keyscan: 'KEY SCAN'};
+    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY SCAN'};
     let collectTimeout = null;
 
     function showCollectPopup(type) {
@@ -622,7 +1149,7 @@
     }
 
     function shakeScreen() {
-        const area = document.querySelector('.game-area');
+        const area = gameAreaEl;
         area.classList.add('shake');
         setTimeout(() => area.classList.remove('shake'), 500);
     }
@@ -630,14 +1157,16 @@
     function flashScreen() {
         const flash = document.createElement('div');
         flash.className = 'screen-flash';
-        document.querySelector('.game-area').appendChild(flash);
+        gameAreaEl.appendChild(flash);
         setTimeout(() => flash.remove(), 260);
     }
 
     function applyEnemyPositions() {
         const cs = cellSize();
+        const now = Date.now();
         for (let i = 0; i < state.enemies.length; i++) {
             if (enemyEls[i]) {
+                enemyEls[i].classList.toggle('is-inactive', state.enemies[i].inactiveUntil > now);
                 const transform = `translate(${state.enemies[i].x * cs}px, ${state.enemies[i].y * cs}px)`;
                 if (state.enemyTransforms[i] !== transform) {
                     state.enemyTransforms[i] = transform;
@@ -652,33 +1181,39 @@
         const visible = computeVisible(state);
         const puMap = {};
         const keyMap = {};
-        const keyScanActive = Date.now() < state.keyScanUntil;
+        const torchMap = {};
         state.powerups.forEach(p => { puMap[p.x + ',' + p.y] = p.type; });
+        state.torches.forEach(t => { torchMap[t.x + ',' + t.y] = true; });
         state.keys.forEach(k => {
             if (!k.collected) keyMap[k.x + ',' + k.y] = true;
         });
 
         for (let y = 0; y < m.h; y++) {
             for (let x = 0; x < m.w; x++) {
-                const key = keyMap[x + ',' + y];
+                const pos = x + ',' + y;
+                const key = keyMap[pos];
+                const scannedKey = key && state.revealed[y][x] === PERMA_VISIBLE;
                 let cls = 'cell ';
 
-                if (!visible[y][x] && !(key && keyScanActive)) {
+                if (!visible[y][x]) {
                     setCellClass(y, x, cls + 'cell-fog');
                     continue;
                 }
 
                 const ch = m.grid[y][x];
                 const isExit = x === m.exitPos.x && y === m.exitPos.y;
-                const pu = puMap[x + ',' + y];
+                const pu = puMap[pos];
+                const torch = torchMap[pos];
                 const isVisited = state.visited.has(x + ',' + y);
                 const isFootprint = state.footprints.has(x + ',' + y);
 
                 if (key) {
                     cls += 'cell-key';
-                    if (keyScanActive && !visible[y][x]) cls += ' cell-key-scan';
+                    if (scannedKey && !visible[y][x]) cls += ' cell-key-scan';
                 } else if (pu) {
                     cls += 'cell-powerup-' + pu;
+                } else if (torch) {
+                    cls += 'cell-torch';
                 } else if (isVisited) {
                     cls += 'cell-visited';
                     if (ch === WALL) cls += ' cell-wall';
@@ -706,6 +1241,7 @@
         setText(movesEl, state.moveCount);
         setText(sizeEl, m.w + '\u00d7' + m.h);
         setText(scoreEl, state.score);
+        setText(livesEl, state.lives);
         setText(enemiesEl, state.enemies.length);
         setText(powerupsEl, state.collectedPowerups + '/' + state.totalPowerups);
         setText(keysEl, state.collectedKeys + '/' + state.totalKeys);
@@ -718,13 +1254,6 @@
             badge.textContent = (PU_NAMES[type] || type.toUpperCase()) + ' ' + remaining;
             effectsBar.appendChild(badge);
         }
-        if (keyScanActive) {
-            const badge = document.createElement('div');
-            badge.className = 'effect-badge effect-keyscan';
-            badge.textContent = 'KEY SCAN ' + Math.ceil((state.keyScanUntil - Date.now()) / 1000);
-            effectsBar.appendChild(badge);
-        }
-
         if (state.dead) {
             deathMoves.textContent = state.moveCount;
             const el = $('#death-score');
@@ -735,6 +1264,7 @@
                 state.deathHandled = true;
                 shakeScreen();
                 sfxDeath();
+                recordRunScore('fail');
             }
         } else {
             deathOverlay.classList.add('hidden');
@@ -744,11 +1274,13 @@
             winMoves.textContent = state.moveCount;
             const el = $('#win-score');
             if (el) el.textContent = state.score;
-            winOverlay.classList.remove('hidden');
+            if (state.showingShortTrack) winOverlay.classList.add('hidden');
+            else winOverlay.classList.remove('hidden');
             setPaused(true);
             if (!state.winHandled) {
                 state.winHandled = true;
                 sfxWin();
+                recordRunScore('win');
             }
         } else {
             winOverlay.classList.add('hidden');
@@ -757,7 +1289,7 @@
 
     function applyPositions() {
         const cs = cellSize();
-        const area = document.querySelector('.game-area');
+        const area = gameAreaEl;
         const availW = area.clientWidth - 4;
         const availH = area.clientHeight - 4;
         const m = state.maze;
@@ -780,6 +1312,107 @@
         setTransform(playerEl, 'playerTransform', `translate(${state.px * cs}px, ${state.py * cs}px)`);
 
         applyEnemyPositions();
+        drawMinimap();
+    }
+
+    function stopShortTrack() {
+        if (shortTrackTimer) {
+            clearInterval(shortTrackTimer);
+            shortTrackTimer = null;
+        }
+        if (trackRunnerEl) trackRunnerEl.classList.add('hidden');
+        if (state) state.showingShortTrack = false;
+        playerEl.classList.remove('is-replay-hidden');
+    }
+
+    function setTrackRunnerPosition(point) {
+        const cs = cellSize();
+        setTransform(trackRunnerEl, 'trackRunnerTransform', `translate(${point.x * cs}px, ${point.y * cs}px)`);
+        updateCamera(state, point.x, point.y);
+        applyPositions();
+    }
+
+    function showShortTrack() {
+        if (!state || !state.won) return;
+        stopShortTrack();
+        const route = buildShortTrackRoute();
+        if (!route.length) return;
+        resetReplayVisibility(state);
+        state.showingShortTrack = true;
+        winOverlay.classList.add('hidden');
+        setPaused(true);
+        playerEl.classList.add('is-replay-hidden');
+        renderMaze();
+        trackRunnerEl.classList.remove('hidden');
+        let index = 0;
+        revealAroundPermanent(state, route[index].x, route[index].y);
+        renderMaze();
+        setTrackRunnerPosition(route[index]);
+        shortTrackTimer = setInterval(() => {
+            index++;
+            if (index >= route.length) {
+                clearInterval(shortTrackTimer);
+                shortTrackTimer = null;
+                return;
+            }
+            revealAroundPermanent(state, route[index].x, route[index].y);
+            renderMaze();
+            setTrackRunnerPosition(route[index]);
+        }, 55);
+    }
+
+    function saveDebugSnapshot() {
+        if (!state) return;
+        const snapshot = {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            seed: state.seed,
+            difficulty,
+            player: {x: state.px, y: state.py},
+            camera: {x: state.camX, y: state.camY},
+            maze: {
+                w: state.maze.w,
+                h: state.maze.h,
+                startPos: state.maze.startPos,
+                exitPos: state.maze.exitPos,
+                grid: state.maze.grid.map(row => row.join('')),
+            },
+            visibility: {
+                forgetThreshold: FORGET_THRESHOLD,
+                permaVisible: PERMA_VISIBLE,
+                revealed: state.revealed.map(row => row.slice()),
+                visible: state.visible.map(row => row.slice()),
+            },
+            keys: state.keys.map(k => ({...k})),
+            powerups: state.powerups.map(p => ({...p})),
+            torches: state.torches.map(t => ({...t})),
+            enemies: state.enemies.map(e => ({...e})),
+            stats: {
+                moves: state.moveCount,
+                score: state.score,
+                won: state.won,
+                dead: state.dead,
+                lives: state.lives,
+                totalKeys: state.totalKeys,
+                collectedKeys: state.collectedKeys,
+                totalPowerups: state.totalPowerups,
+                collectedPowerups: state.collectedPowerups,
+            },
+        };
+        const text = JSON.stringify(snapshot, null, 2);
+        try {
+            localStorage.setItem(DEBUG_SNAPSHOT_KEY, text);
+        } catch (e) {}
+        try {
+            const blob = new Blob([text], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'laby-snapshot-' + state.seed + '-' + Date.now() + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {}
+        showCollectPopup('SNAPSHOT SAVED');
     }
 
     // ─── Game Loop ────────────────────────────────────────────────────────
@@ -799,6 +1432,7 @@
 
     function newGame(width, height, seed = makeSeed()) {
         initAudio();
+        stopShortTrack();
         setPaused(false);
         currentSeed = seed.trim ? seed.trim().toUpperCase() : String(seed).toUpperCase();
         if (!currentSeed) currentSeed = makeSeed();
@@ -858,11 +1492,14 @@
 
     function closeSettings() {
         settingsModal.classList.add('hidden');
-        if (helpModal.classList.contains('hidden')) setPaused(false);
+        if (helpModal.classList.contains('hidden') && scoresOverlay.classList.contains('hidden')) setPaused(false);
     }
 
     function showDifficulty() {
+        pendingScoreEntry = null;
+        scoresOverlay.classList.add('hidden');
         difficultyModal.classList.remove('hidden');
+        setPaused(true);
     }
 
     function toggleHelp() {
@@ -871,19 +1508,43 @@
             setPaused(true);
         } else {
             helpModal.classList.add('hidden');
-            if (settingsModal.classList.contains('hidden')) setPaused(false);
+            if (settingsModal.classList.contains('hidden') && scoresOverlay.classList.contains('hidden')) setPaused(false);
         }
     }
 
     const keyMap = {
-        ArrowUp: [0, -1], w: [0, -1], W: [0, -1],
-        ArrowDown: [0, 1], s: [0, 1], S: [0, 1],
-        ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0],
-        ArrowRight: [1, 0], d: [1, 0], D: [1, 0],
+        ArrowUp: [0, -1], KeyW: [0, -1],
+        ArrowDown: [0, 1], KeyS: [0, 1],
+        ArrowLeft: [-1, 0], KeyA: [-1, 0],
+        ArrowRight: [1, 0], KeyD: [1, 0],
     };
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'h' || e.key === 'H') {
+        if (pendingScoreEntry) {
+            if (handleScoreInput(e)) e.preventDefault();
+            return;
+        }
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (scoresOverlay.classList.contains('hidden')) showScores(activeScoreTab);
+            else closeScores();
+            return;
+        }
+        if (e.code === 'KeyZ') {
+            e.preventDefault();
+            resetScoreTables();
+            return;
+        }
+        if (e.code === 'KeyX') {
+            e.preventDefault();
+            saveDebugSnapshot();
+            return;
+        }
+        if (!scoresOverlay.classList.contains('hidden')) {
+            if (e.key === 'Escape') closeScores();
+            return;
+        }
+        if (e.code === 'KeyH') {
             if (!state || state.won || state.dead) return;
             toggleHelp();
             return;
@@ -897,25 +1558,32 @@
             return;
         }
         if (paused) return;
-        if (e.key in keyMap) {
+        if (e.code in keyMap) {
             e.preventDefault();
-            move(...keyMap[e.key]);
-        } else if (e.key === 'r' || e.key === 'R') {
+            move(...keyMap[e.code]);
+        } else if (e.code === 'KeyR') {
             e.preventDefault();
             openSettings();
         }
     });
 
     $('#btn-new-after-win').addEventListener('click', showDifficulty);
+    $('#btn-show-short-track').addEventListener('click', showShortTrack);
     $('#btn-new-after-death').addEventListener('click', showDifficulty);
+    $('#btn-new-after-scores').addEventListener('click', showDifficulty);
+    $('#btn-scores-close').addEventListener('click', closeScores);
+    const resetScoresButton = $('#btn-reset-scores');
+    if (resetScoresButton) resetScoresButton.addEventListener('click', resetScoreTables);
     $('#btn-cancel').addEventListener('click', closeSettings);
     $('#btn-help-close').addEventListener('click', toggleHelp);
     helpModal.querySelector('.modal-backdrop').addEventListener('click', toggleHelp);
     $('.help-hint').addEventListener('click', toggleHelp);
 
     $('#btn-generate').addEventListener('click', () => {
-        const w = parseInt(inputWidth.value, 10) || 71;
-        const h = parseInt(inputHeight.value, 10) || 41;
+        const w = clampMazeSide(inputWidth.value, 71);
+        const h = clampMazeSide(inputHeight.value, 41);
+        inputWidth.value = w;
+        inputHeight.value = h;
         const seed = inputSeed.value || makeSeed();
         closeSettings();
         newGame(w, h, seed);
@@ -933,7 +1601,16 @@
             difficulty = btn.dataset.diff;
             const cfg = DIFFICULTY[difficulty];
             difficultyModal.classList.add('hidden');
+            scoresOverlay.classList.add('hidden');
             newGame(cfg.width, cfg.height);
+        });
+    });
+
+    document.querySelectorAll('[data-score-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (pendingScoreEntry) return;
+            activeScoreTab = btn.dataset.scoreTab;
+            renderScoreTable();
         });
     });
 })();

@@ -30,7 +30,7 @@ Then open `http://127.0.0.1:8765/`.
 - Start: left side, randomly top `(1,1)` or bottom `(1,h-2)`
 - Exit: right side on the opposite diagonal: `(w-2,h-2)` or `(w-2,1)`
 - Generation uses a short seed code shown in the header and accepted in settings
-- Default: 71x41, configurable up to 201x201
+- Default: 71x41, configurable up to 151x151
 
 ### Camera system (`updateCamera`, `applyPositions`)
 
@@ -63,25 +63,26 @@ enemies[]   — {type, size, x, y, dir, ticks, chaseEvery, minX, maxX, minY, max
 keys[]      — {x, y, collected}
 powerups[]  — {x, y, type}
 effects     — {vision: N, freeze: N, away: N}
-keyScanUntil — timestamp for temporary key scan highlighting
-revealed[][] — moveCount when each cell was last revealed (-1 = never)
+revealed[][] — moveCount when each cell was last revealed (-1 = never, 255 = permanent)
 footprints  — Set of "x,y" strings
 visited     — Set of "x,y" strings
-score, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, collectedPowerups
+score, lives, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, collectedPowerups
 ```
 
 ### Difficulty
 
 Game starts with difficulty selection modal. Stored in `difficulty` variable, affects maze size and enemy behavior.
+`beginner` uses the Easy-sized maze without enemies and does not write to high scores.
 
 | Level | Maze size | Patrol density/chase | Hunter density/chase |
 |-------|-----------|----------------------|----------------------|
+| beginner | 71x41 | none | none |
 | easy   | 71x41 | 1 per 800 cells / 10 | 1 per 800 cells / 8 |
 | medium | 81x51 | 1 per 700 cells / 9 | 1 per 800 cells / 7 |
 | hard   | 91x61 | 1 per 600 cells / 8 | 1 per 800 cells / 6 |
 
 Chase: every N-th tick, enemy picks direction closest to player (including diagonal).
-`DIFFICULTY` stores maze size, patrol chase interval, and hunter chase interval.
+`DIFFICULTY` stores maze size, patrol chase interval, hunter chase interval, and whether enemies are enabled.
 
 ### Enemies (`placeEnemies`, `tickEnemies`)
 
@@ -96,6 +97,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - Enemies avoid overlapping each other while spawning and moving
 - All enemies always move (even off-screen), tick every 600ms
 - Collision uses each enemy's `size`
+- Player starts with 5 lives. Enemy contact removes 1 life, hides that enemy for 5 seconds, then respawns it in its zone. Last life triggers failure.
 
 ### Keys
 
@@ -107,6 +109,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 
 - `PU_DENSITY = 100` — 1 powerup per 100 total cells
 - Key Scan powerups are placed first, at least 2 per key when space allows
+- Torch powerups are placed separately: `keys + 1`, kept away from map edges when space allows
 - Other types cycle: `vision → freeze → xray → bonus → penalty → away` (`away` is shown to players as Repel)
 - Placed on random `PATH` cells, at least 5 Manhattan distance from start
 - Effects:
@@ -116,7 +119,8 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - `bonus` — instant +100 score, no duration
   - `penalty` — instant -50 score, clamped at 0
   - `away` / **Repel** — enemies flee from player, lasts 5 enemy ticks
-  - `keyscan` — highlights uncollected keys for 5 seconds
+  - `torch` — permanently reveals a circular radius-4 area around the pickup cell
+  - `keyscan` — permanently reveals uncollected key positions on the map
 
 ### Scoring
 
@@ -125,12 +129,28 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - `+100` per `bonus` powerup collected
 - `-50` per `penalty` powerup collected; score is clamped at 0
 
+### High scores
+
+- Stored locally in `localStorage` under `laby.highScores.v1`
+- Separate TOP-5 tables for `easy`, `medium`, and `hard`
+- Default rows are `PLAYER 0000`
+- Runs are ranked by higher score, then fewer moves
+- After win/death, qualifying runs insert into the table immediately and ask for a 7-character name
+- Name entry uses physical `A-Z` / `0-9` keys, so it works even when the keyboard layout is not English
+- Press `Space` to show scores
+- Press `Z` to reset score tables
+
 ### UI flow
 
-- **Header**: Moves, Powerups, Keys, Score, Enemies, Map, Seed, H Help button
+- **Header**: Moves, Powerups, Keys, Score, Lives, Enemies, Map, Seed, H Help button
 - **R**: opens settings modal (custom maze size and optional seed)
 - **WASD / Arrows**: move
 - **H**: opens help
+- **Space**: opens/closes local high scores
+- **Z**: resets local high scores
+- Keyboard controls use physical key codes, so `WASD/R/H/Z` work in non-English layouts
+- Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it
+- After winning, `Show short track` replays a computed route from start through all keys to the exit without enemies
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
 - **Collect popup**: floating powerup name for 2 seconds, centered on screen
@@ -147,7 +167,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - Hunters: cyan/magenta 2x2 scanner drones
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
-  - Powerups: cyan/silver/magenta/gold/red/orange/green pixel module icons
+  - Powerups: cyan/silver/magenta/gold/red/orange/green/amber pixel module icons
 - Cell size: `--cell-size: 36px` desktop, `25px` mobile
 
 ## Performance notes
@@ -163,7 +183,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 
 ```
 PU_DENSITY = 100       — powerups per total cells
-EXTRA_PATH_DENSITY = 40 — lower value opens more wall links after maze generation
+EXTRA_PATH_DENSITY = 32 — lower value opens more wall links after maze generation
 KEY_DENSITY = 800      — keys per total cells
 PENALTY_POINTS = 50    — negative pickup score loss
 HUNTER_DENSITY = 800   — hunters per total cells
