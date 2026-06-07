@@ -178,6 +178,7 @@
     const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'penalty', 'away'];
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
     const BONUS_POINTS = 100;
+    const KEY_SCAN_BONUS_POINTS = 20;
     const PENALTY_POINTS = 50;
     const CELL_POINTS = 10;
     const REVISIT_PENALTY = 1;
@@ -185,8 +186,8 @@
     const HIT_RESPAWN_MS = 5000;
     const HIT_INVULNERABLE_MS = 900;
     const ENEMY_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
-    const FORGET_THRESHOLD = 10;
-    const PERMA_VISIBLE = 255;
+    const FORGET_THRESHOLD = 7;
+    const PERMA_VISIBLE = -2;
     const TORCH_RADIUS = 4;
     const TORCH_EDGE_MARGIN = TORCH_RADIUS + 2;
     const MAX_CUSTOM_SIDE = 151;
@@ -240,6 +241,8 @@
             powerups: [],
             torches: [],
             effects: {},
+            replayKeys: null,
+            replayCollectedKeys: 0,
             footprints: new Set(),
             visited: new Set(),
             camX: 0,
@@ -440,16 +443,60 @@
         }
     }
 
+    function applyKeyScan(state) {
+        const hiddenKeys = state.keys.filter(key =>
+            !key.collected && state.revealed[key.y][key.x] !== PERMA_VISIBLE
+        );
+        if (!hiddenKeys.length) {
+            state.score += KEY_SCAN_BONUS_POINTS;
+            return 'score';
+        }
+        const key = hiddenKeys[Math.floor(rng() * hiddenKeys.length)];
+        revealCellPermanent(state, key.x, key.y);
+        return 'key';
+    }
+
     function revealAround(state, cx, cy) {
-        const r = effectiveRadius(state);
+        const baseRadius = effectiveRadius(state);
         const m = state.maze;
-        for (let dy = -r; dy <= r; dy++) {
-            for (let dx = -r; dx <= r; dx++) {
+        const revealIfInside = (x, y) => {
+            if (x >= 0 && x < m.w && y >= 0 && y < m.h) revealCell(state, x, y);
+        };
+
+        if (state.effects.vision) {
+            const r = TORCH_RADIUS;
+            const r2 = r * r;
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (dx * dx + dy * dy <= r2) revealIfInside(cx + dx, cy + dy);
+                }
+            }
+            return;
+        }
+
+        for (let dy = -baseRadius; dy <= baseRadius; dy++) {
+            for (let dx = -baseRadius; dx <= baseRadius; dx++) {
                 const nx = cx + dx;
                 const ny = cy + dy;
-                if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-                    revealCell(state, nx, ny);
+                revealIfInside(nx, ny);
+            }
+        }
+
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            for (let step = 1; step <= 3; step++) {
+                const nx = cx + dx * step;
+                const ny = cy + dy * step;
+                if (nx < 0 || nx >= m.w || ny < 0 || ny >= m.h) break;
+
+                revealCell(state, nx, ny);
+                if (dx !== 0) {
+                    revealIfInside(nx, ny - 1);
+                    revealIfInside(nx, ny + 1);
+                } else {
+                    revealIfInside(nx - 1, ny);
+                    revealIfInside(nx + 1, ny);
                 }
+                if (m.grid[ny][nx] === WALL) break;
             }
         }
     }
@@ -581,9 +628,10 @@
                 } else if (type === 'xray') {
                     revealArea(state, state.px, state.py, 4);
                 } else if (type === 'keyscan') {
-                    state.keys.forEach(key => {
-                        if (!key.collected) revealCellPermanent(state, key.x, key.y);
-                    });
+                    const result = applyKeyScan(state);
+                    state.powerups.splice(i, 1);
+                    state.collectedPowerups++;
+                    return result === 'score' ? 'keyscan-bonus' : type;
                 } else if (type === 'torch') {
                     state.torches.push({x: p.x, y: p.y});
                     revealCirclePermanent(state, p.x, p.y, TORCH_RADIUS);
@@ -602,6 +650,9 @@
         for (const key of state.keys) {
             if (!key.collected && key.x === state.px && key.y === state.py) {
                 key.collected = true;
+                if (state.revealed[key.y][key.x] === PERMA_VISIBLE) {
+                    state.revealed[key.y][key.x] = state.moveCount;
+                }
                 state.collectedKeys++;
                 return true;
             }
@@ -691,6 +742,8 @@
     const collectPopup = $('#collect-popup');
     const winOverlay = $('#win-overlay');
     const winMoves = $('#win-moves');
+    const winShortMoves = $('#win-short-moves');
+    const winVisited = $('#win-visited');
     const deathOverlay = $('#death-overlay');
     const deathMoves = $('#death-moves');
     const scoresOverlay = $('#scores-overlay');
@@ -1135,7 +1188,7 @@
         }
     }
 
-    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY SCAN'};
+    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY SCAN', 'keyscan-bonus': '+20 PTS'};
     let collectTimeout = null;
 
     function showCollectPopup(type) {
@@ -1182,9 +1235,11 @@
         const puMap = {};
         const keyMap = {};
         const torchMap = {};
+        const renderKeys = state.showingShortTrack && state.replayKeys ? state.replayKeys : state.keys;
+        const renderCollectedKeys = state.showingShortTrack ? state.replayCollectedKeys : state.collectedKeys;
         state.powerups.forEach(p => { puMap[p.x + ',' + p.y] = p.type; });
         state.torches.forEach(t => { torchMap[t.x + ',' + t.y] = true; });
-        state.keys.forEach(k => {
+        renderKeys.forEach(k => {
             if (!k.collected) keyMap[k.x + ',' + k.y] = true;
         });
 
@@ -1217,17 +1272,17 @@
                 } else if (isVisited) {
                     cls += 'cell-visited';
                     if (ch === WALL) cls += ' cell-wall';
-                    else if (isExit) cls += state.collectedKeys >= state.totalKeys ? ' cell-exit' : ' cell-exit-locked';
+                    else if (isExit) cls += renderCollectedKeys >= state.totalKeys ? ' cell-exit' : ' cell-exit-locked';
                     else cls += ' cell-path';
                 } else if (isFootprint) {
                     cls += 'cell-footprint';
                     if (ch === WALL) cls += ' cell-wall';
-                    else if (isExit) cls += state.collectedKeys >= state.totalKeys ? ' cell-exit' : ' cell-exit-locked';
+                    else if (isExit) cls += renderCollectedKeys >= state.totalKeys ? ' cell-exit' : ' cell-exit-locked';
                     else cls += ' cell-path';
                 } else if (ch === WALL) {
                     cls += 'cell-wall';
                 } else if (isExit) {
-                    cls += state.collectedKeys >= state.totalKeys ? 'cell-exit' : 'cell-exit-locked';
+                    cls += renderCollectedKeys >= state.totalKeys ? 'cell-exit' : 'cell-exit-locked';
                 } else {
                     cls += 'cell-path';
                 }
@@ -1244,7 +1299,7 @@
         setText(livesEl, state.lives);
         setText(enemiesEl, state.enemies.length);
         setText(powerupsEl, state.collectedPowerups + '/' + state.totalPowerups);
-        setText(keysEl, state.collectedKeys + '/' + state.totalKeys);
+        setText(keysEl, renderCollectedKeys + '/' + state.totalKeys);
         setText(seedEl, state.seed);
 
         effectsBar.innerHTML = '';
@@ -1274,6 +1329,7 @@
             winMoves.textContent = state.moveCount;
             const el = $('#win-score');
             if (el) el.textContent = state.score;
+            updateWinStats();
             if (state.showingShortTrack) winOverlay.classList.add('hidden');
             else winOverlay.classList.remove('hidden');
             setPaused(true);
@@ -1322,6 +1378,10 @@
         }
         if (trackRunnerEl) trackRunnerEl.classList.add('hidden');
         if (state) state.showingShortTrack = false;
+        if (state) {
+            state.replayKeys = null;
+            state.replayCollectedKeys = 0;
+        }
         playerEl.classList.remove('is-replay-hidden');
     }
 
@@ -1332,12 +1392,41 @@
         applyPositions();
     }
 
+    function collectReplayKey(point) {
+        if (!state.replayKeys) return;
+        for (const key of state.replayKeys) {
+            if (!key.collected && key.x === point.x && key.y === point.y) {
+                key.collected = true;
+                state.replayCollectedKeys++;
+                break;
+            }
+        }
+    }
+
+    function countWalkableCells() {
+        let count = 0;
+        for (let y = 0; y < state.maze.h; y++) {
+            for (let x = 0; x < state.maze.w; x++) {
+                if (state.maze.grid[y][x] !== WALL) count++;
+            }
+        }
+        return count;
+    }
+
+    function updateWinStats() {
+        const route = buildShortTrackRoute();
+        setText(winShortMoves, route.length ? route.length - 1 : '--');
+        setText(winVisited, state.visited.size + '/' + countWalkableCells());
+    }
+
     function showShortTrack() {
         if (!state || !state.won) return;
         stopShortTrack();
         const route = buildShortTrackRoute();
         if (!route.length) return;
         resetReplayVisibility(state);
+        state.replayKeys = state.keys.map(k => ({x: k.x, y: k.y, collected: false}));
+        state.replayCollectedKeys = 0;
         state.showingShortTrack = true;
         winOverlay.classList.add('hidden');
         setPaused(true);
@@ -1346,6 +1435,7 @@
         trackRunnerEl.classList.remove('hidden');
         let index = 0;
         revealAroundPermanent(state, route[index].x, route[index].y);
+        collectReplayKey(route[index]);
         renderMaze();
         setTrackRunnerPosition(route[index]);
         shortTrackTimer = setInterval(() => {
@@ -1356,6 +1446,7 @@
                 return;
             }
             revealAroundPermanent(state, route[index].x, route[index].y);
+            collectReplayKey(route[index]);
             renderMaze();
             setTrackRunnerPosition(route[index]);
         }, 55);
@@ -1363,12 +1454,49 @@
 
     function saveDebugSnapshot() {
         if (!state) return;
+        const cs = cellSize();
+        const viewport = {
+            pixelWidth: gameAreaEl.clientWidth,
+            pixelHeight: gameAreaEl.clientHeight,
+            cellSize: cs,
+            cellWidth: Math.floor((gameAreaEl.clientWidth - 4) / cs),
+            cellHeight: Math.floor((gameAreaEl.clientHeight - 4) / cs),
+            camX: state.camX,
+            camY: state.camY,
+        };
+        const permanentCells = [];
+        const recentVisibleCells = [];
+        const staleRevealedCells = [];
+        for (let y = 0; y < state.maze.h; y++) {
+            for (let x = 0; x < state.maze.w; x++) {
+                const revealedAt = state.revealed[y][x];
+                if (revealedAt === PERMA_VISIBLE) {
+                    permanentCells.push({x, y, ch: state.maze.grid[y][x]});
+                } else if (revealedAt >= 0) {
+                    const age = state.moveCount - revealedAt;
+                    const cell = {x, y, ch: state.maze.grid[y][x], revealedAt, age};
+                    if (age <= FORGET_THRESHOLD) recentVisibleCells.push(cell);
+                    else staleRevealedCells.push(cell);
+                }
+            }
+        }
         const snapshot = {
             version: 1,
             createdAt: new Date().toISOString(),
             seed: state.seed,
             difficulty,
+            constants: {
+                forgetThreshold: FORGET_THRESHOLD,
+                permaVisible: PERMA_VISIBLE,
+                torchRadius: TORCH_RADIUS,
+                maxCustomSide: MAX_CUSTOM_SIDE,
+                extraPathDensity: EXTRA_PATH_DENSITY,
+                keyDensity: KEY_DENSITY,
+                powerupDensity: PU_DENSITY,
+                hunterDensity: HUNTER_DENSITY,
+            },
             player: {x: state.px, y: state.py},
+            viewport,
             camera: {x: state.camX, y: state.camY},
             maze: {
                 w: state.maze.w,
@@ -1383,10 +1511,23 @@
                 revealed: state.revealed.map(row => row.slice()),
                 visible: state.visible.map(row => row.slice()),
             },
+            visibilitySummary: {
+                permanentCells,
+                recentVisibleCells,
+                staleRevealedCells,
+            },
             keys: state.keys.map(k => ({...k})),
+            replayKeys: state.replayKeys ? state.replayKeys.map(k => ({...k})) : null,
             powerups: state.powerups.map(p => ({...p})),
             torches: state.torches.map(t => ({...t})),
             enemies: state.enemies.map(e => ({...e})),
+            effects: {...state.effects},
+            flags: {
+                paused,
+                showingShortTrack: !!state.showingShortTrack,
+                shortTrackRunning: !!shortTrackTimer,
+                invulnerableForMs: Math.max(0, state.invulnerableUntil - Date.now()),
+            },
             stats: {
                 moves: state.moveCount,
                 score: state.score,
@@ -1395,6 +1536,7 @@
                 lives: state.lives,
                 totalKeys: state.totalKeys,
                 collectedKeys: state.collectedKeys,
+                replayCollectedKeys: state.replayCollectedKeys,
                 totalPowerups: state.totalPowerups,
                 collectedPowerups: state.collectedPowerups,
             },

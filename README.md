@@ -48,7 +48,8 @@ Then open `http://127.0.0.1:8765/`.
 - `renderMaze()`: computes cell state each frame, but writes `className` only when a cell actually changes
 - Enemies are created dynamically in `buildGrid()`, stored in `enemyEls[]`
 - Container/player/enemy transforms are cached to avoid duplicate style writes
-- Fog of war: cells not recently revealed get `.cell-fog`. `FORGET_THRESHOLD = 10` moves
+- Fog of war: cells not recently revealed get `.cell-fog`. `FORGET_THRESHOLD = 7` moves
+- Normal sight reveals the 1-cell area around the player, plus straight corridor rays up to 3 cells in four cardinal directions. Corridor side walls are revealed; a wall directly ahead is revealed and stops that ray.
 
 ### Game state (`createGame`)
 
@@ -63,7 +64,7 @@ enemies[]   — {type, size, x, y, dir, ticks, chaseEvery, minX, maxX, minY, max
 keys[]      — {x, y, collected}
 powerups[]  — {x, y, type}
 effects     — {vision: N, freeze: N, away: N}
-revealed[][] — moveCount when each cell was last revealed (-1 = never, 255 = permanent)
+revealed[][] — moveCount when each cell was last revealed (-1 = never, -2 = permanent)
 footprints  — Set of "x,y" strings
 visited     — Set of "x,y" strings
 score, lives, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, collectedPowerups
@@ -113,14 +114,14 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - Other types cycle: `vision → freeze → xray → bonus → penalty → away` (`away` is shown to players as Repel)
 - Placed on random `PATH` cells, at least 5 Manhattan distance from start
 - Effects:
-  - `vision` — radius 2, lasts 15 moves
+  - `vision` — circular radius 4 around player, lasts 15 moves
   - `freeze` — stops all enemies, lasts 12 moves
   - `xray` — instant 9x9 reveal around player, cells fade by normal fog rules
   - `bonus` — instant +100 score, no duration
   - `penalty` — instant -50 score, clamped at 0
   - `away` / **Repel** — enemies flee from player, lasts 5 enemy ticks
   - `torch` — permanently reveals a circular radius-4 area around the pickup cell
-  - `keyscan` — permanently reveals uncollected key positions on the map
+  - `keyscan` — permanently reveals one random hidden key; if all keys are already revealed, gives +20 score
 
 ### Scoring
 
@@ -149,8 +150,8 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - **Space**: opens/closes local high scores
 - **Z**: resets local high scores
 - Keyboard controls use physical key codes, so `WASD/R/H/Z` work in non-English layouts
-- Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it
-- After winning, `Show short track` replays a computed route from start through all keys to the exit without enemies
+- Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
+- Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit without enemies; keys are shown and collected during the replay.
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
 - **Collect popup**: floating powerup name for 2 seconds, centered on screen
@@ -167,6 +168,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - Hunters: cyan/magenta 2x2 scanner drones
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
+  - Exit: locked grate before keys, open green pixel door after keys
   - Powerups: cyan/silver/magenta/gold/red/orange/green/amber pixel module icons
 - Cell size: `--cell-size: 36px` desktop, `25px` mobile
 
@@ -186,9 +188,10 @@ PU_DENSITY = 100       — powerups per total cells
 EXTRA_PATH_DENSITY = 32 — lower value opens more wall links after maze generation
 KEY_DENSITY = 800      — keys per total cells
 PENALTY_POINTS = 50    — negative pickup score loss
+KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Scan has no hidden key left to reveal
 HUNTER_DENSITY = 800   — hunters per total cells
 Difficulty: easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6)
-FORGET_THRESHOLD = 10  — fog returns after N moves
+FORGET_THRESHOLD = 7   — fog returns after N moves
 Cell: 36px (desktop) / 25px (mobile)
 Tick: 600ms
 Camera: 40% from left, 50% from top
