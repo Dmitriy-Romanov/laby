@@ -25,6 +25,10 @@
                 <span class="stat-value" id="powerups">0/0</span>
             </div>
             <div class="stat">
+                <span class="stat-label">Keys</span>
+                <span class="stat-value" id="keys">0/0</span>
+            </div>
+            <div class="stat">
                 <span class="stat-label">Score</span>
                 <span class="stat-value" id="score">0</span>
             </div>
@@ -35,6 +39,10 @@
             <div class="stat">
                 <span class="stat-label">Map</span>
                 <span class="stat-value" id="size">—</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Seed</span>
+                <span class="stat-value stat-seed" id="seed">—</span>
             </div>
         </div>
         <button class="help-hint" type="button" aria-label="H Help">
@@ -83,15 +91,15 @@
         <div class="difficulty-options">
             <button class="btn btn-difficulty" data-diff="easy">
                 <span class="diff-name">EASY</span>
-                <span class="diff-desc">71x41, chase 10</span>
+                <span class="diff-desc">71x41, patrol 800</span>
             </button>
             <button class="btn btn-difficulty" data-diff="medium">
                 <span class="diff-name">MEDIUM</span>
-                <span class="diff-desc">81x51, density 550</span>
+                <span class="diff-desc">81x51, patrol 700</span>
             </button>
             <button class="btn btn-difficulty" data-diff="hard">
                 <span class="diff-name">HARD</span>
-                <span class="diff-desc">91x61, density 500</span>
+                <span class="diff-desc">91x61, patrol 600</span>
             </button>
         </div>
     </div>
@@ -109,6 +117,10 @@
         <label>
             Height <span class="hint">(odd, minimum 7)</span>
             <input type="number" id="input-height" value="41" min="7" max="201" step="2">
+        </label>
+        <label>
+            Seed <span class="hint">(blank for random)</span>
+            <input type="text" id="input-seed" value="" maxlength="16">
         </label>
         <div class="modal-actions">
             <button class="btn btn-secondary" id="btn-cancel">Cancel</button>
@@ -130,21 +142,26 @@
         </div>
         <div class="help-section">
             <h3>Powerups</h3>
-            <div class="help-row"><span class="pu-icon pu-vision" aria-hidden="true"></span> <strong>Vision</strong> — larger visibility for 15 moves</div>
-            <div class="help-row"><span class="pu-icon pu-freeze" aria-hidden="true"></span> <strong>Freeze</strong> — stops enemies for 12 moves</div>
-            <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal a 9x9 area</div>
-            <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — plus 100 points</div>
-            <div class="help-row"><span class="pu-icon pu-away" aria-hidden="true"></span> <strong>Repel</strong> — enemies retreat for 5 ticks</div>
+            <div class="help-powerups">
+                <div class="help-row"><span class="pu-icon pu-vision" aria-hidden="true"></span> <strong>Vision</strong> — visibility +15</div>
+                <div class="help-row"><span class="pu-icon pu-freeze" aria-hidden="true"></span> <strong>Freeze</strong> — stop enemies</div>
+                <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal 9x9</div>
+                <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — +100 pts</div>
+                <div class="help-row"><span class="pu-icon pu-penalty" aria-hidden="true"></span> <strong>Penalty</strong> — -50 pts</div>
+                <div class="help-row"><span class="pu-icon pu-away" aria-hidden="true"></span> <strong>Repel</strong> — enemy retreat</div>
+                <div class="help-row"><span class="pu-icon pu-keyscan" aria-hidden="true"></span> <strong>Key Scan</strong> — keys glow</div>
+            </div>
         </div>
         <div class="help-section">
             <h3>Scoring</h3>
             <div class="help-row">+10 for each new cell visited</div>
             <div class="help-row">-1 for stepping on a visited cell</div>
             <div class="help-row">+100 for a <span class="pu-icon pu-bonus" aria-hidden="true"></span> bonus pickup</div>
+            <div class="help-row">-50 for a <span class="pu-icon pu-penalty" aria-hidden="true"></span> penalty pickup, never below 0</div>
         </div>
         <div class="help-section">
             <h3>Goal</h3>
-            <div class="help-row">Reach the exit in the lower-right sector.</div>
+            <div class="help-row">Collect all keys, then reach the exit.</div>
             <div class="help-row">Red patrol zones are dangerous.</div>
         </div>
         <div class="modal-actions">
