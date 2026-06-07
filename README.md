@@ -17,7 +17,8 @@ Pure static web game (no backend, no build step). Open `index.html` in a browser
 - Recursive backtracking on odd-sized grid
 - `WALL = '█'`, `PATH = ' '`, `EXIT = '$'`
 - Extra paths opened (`grid cells / 60` walls removed) for multiple solutions
-- Start: (1,1), Exit: (w-2, h-2)
+- Start: left side, randomly top `(1,1)` or bottom `(1,h-2)`
+- Exit: right side on the opposite diagonal: `(w-2,h-2)` or `(w-2,1)`
 - Default: 71x41, configurable up to 201x201
 
 ### Camera system (`updateCamera`, `applyPositions`)
@@ -42,7 +43,7 @@ Pure static web game (no backend, no build step). Open `index.html` in a browser
 Key fields on `state`:
 
 ```
-maze        — {grid[][], w, h, exitPos}
+maze        — {grid[][], w, h, startPos, exitPos}
 px, py      — player position (world coords)
 camX, camY  — camera offset in cells
 enemies[]   — {x, y, dir, ticks, minX, maxX, minY, maxY}
@@ -57,13 +58,13 @@ score, moveCount, won, dead, totalPowerups, collectedPowerups
 
 ### Difficulty
 
-Game starts with difficulty selection modal. Stored in `difficulty` variable, affects `createGame`.
+Game starts with difficulty selection modal. Stored in `difficulty` variable, affects maze size and enemy behavior.
 
-| Level | Enemy density | Chase every N ticks |
-|-------|--------------|-------------------|
-| easy   | 1 per 600 cells | 10 |
-| medium | 1 per 600 cells | 9 |
-| hard   | 1 per 500 cells | 8 |
+| Level | Maze size | Enemy density | Chase every N ticks |
+|-------|-----------|--------------|-------------------|
+| easy   | 71x41 | 1 per 600 cells | 10 |
+| medium | 81x51 | 1 per 550 cells | 9 |
+| hard   | 91x61 | 1 per 500 cells | 8 |
 
 Chase: every N-th tick, enemy picks direction closest to player (including diagonal).
 `state.chaseEvery` stores the interval. `DIFFICULTY` object holds config.
@@ -82,26 +83,28 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 ### Powerups (`placePowerups`, `collectPowerup`)
 
 - `PU_DENSITY = 100` — 1 powerup per 100 total cells
-- Types cycle: `vision → freeze → xray → bonus → away`
+- Types cycle: `vision → freeze → xray → bonus → away` (`away` is shown to players as Repel)
 - Placed on random `PATH` cells, at least 5 Manhattan distance from start
 - Effects:
   - `vision` — radius 2, lasts 15 moves
   - `freeze` — stops all enemies, lasts 12 moves
   - `xray` — instant 9x9 reveal around player, cells fade by normal fog rules
   - `bonus` — instant +100 score, no duration
-  - `away` — enemies flee from player, lasts 5 enemy ticks
+  - `away` / **Repel** — enemies flee from player, lasts 5 enemy ticks
 
 ### Scoring
 
 - `+10` per new cell visited (first time stepping on it)
+- `-1` per step onto an already visited cell; score is clamped at 0
 - `+100` per `bonus` powerup collected
 
 ### UI flow
 
-- **Header**: Moves, Size, Powerups (collected/total), Score, F1 Help button
+- **Header**: Moves, Size, Powerups (collected/total), Score, H Help button
 - **R**: opens settings modal (custom maze size)
 - **WASD / Arrows**: move
-- **Collect popup**: floating text `◉ VISION` etc. for 2 seconds, centered on screen
+- **H**: opens help
+- **Collect popup**: floating powerup name for 2 seconds, centered on screen
 - **Win/Death overlays**: show moves + score, button to restart
 
 ## Visual style
@@ -114,16 +117,16 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - Enemies: `#ff0000` (red) 3x3 blocks with eyes
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
-  - Powerups: cyan/silver/magenta/gold/orange with Unicode symbols
-- Cell size: `--cell-size: 31px` desktop, `20px` mobile
+  - Powerups: cyan/silver/magenta/gold/orange pixel module icons
+- Cell size: `--cell-size: 36px` desktop, `25px` mobile
 
 ## Key constants (game.js top)
 
 ```
 PU_DENSITY = 100       — powerups per total cells
-Difficulty: easy (600/10), medium (600/9), hard (500/8)  — enemy density / chase ticks
+Difficulty: easy (71x41, 600/10), medium (81x51, 550/9), hard (91x61, 500/8)
 FORGET_THRESHOLD = 10  — fog returns after N moves
-Cell: 31px (desktop) / 20px (mobile)
+Cell: 36px (desktop) / 25px (mobile)
 Tick: 600ms
 Camera: 40% from left, 50% from top
 Default maze: 71 x 41

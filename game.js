@@ -78,8 +78,11 @@
             if (!carved) stack.pop();
         }
 
-        const exitY = h - 2;
+        const startY = Math.random() < 0.5 ? 1 : h - 2;
+        const exitY = startY === 1 ? h - 2 : 1;
         const exitX = w - 2;
+        grid[1][1] = PATH;
+        grid[h - 2][1] = PATH;
         grid[exitY][exitX] = EXIT;
 
         const candidates = [];
@@ -97,7 +100,7 @@
             grid[candidates[i].y][candidates[i].x] = PATH;
         }
 
-        return {grid, w, h, exitPos: {x: exitX, y: exitY}};
+        return {grid, w, h, startPos: {x: 1, y: startY}, exitPos: {x: exitX, y: exitY}};
     }
 
     function shuffleArray(arr) {
@@ -110,15 +113,16 @@
     // ─── Game State ────────────────────────────────────────────────────────
     const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'away'];
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
-    const PU_POINTS = {bonus: 100};
+    const BONUS_POINTS = 100;
     const CELL_POINTS = 10;
+    const REVISIT_PENALTY = 1;
     const ENEMY_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
     const FORGET_THRESHOLD = 10;
     const PU_DENSITY = 100;
     const DIFFICULTY = {
-        easy:   {enemyDensity: 600, chaseEvery: 10},
-        medium: {enemyDensity: 600, chaseEvery: 9},
-        hard:   {enemyDensity: 500, chaseEvery: 8},
+        easy:   {width: 71, height: 41, enemyDensity: 600, chaseEvery: 10},
+        medium: {width: 81, height: 51, enemyDensity: 550, chaseEvery: 9},
+        hard:   {width: 91, height: 61, enemyDensity: 500, chaseEvery: 8},
     };
     let difficulty = 'easy';
 
@@ -131,8 +135,8 @@
 
         const state = {
             maze,
-            px: 1,
-            py: 1,
+            px: maze.startPos.x,
+            py: maze.startPos.y,
             moveCount: 0,
             score: 0,
             won: false,
@@ -150,10 +154,9 @@
             collectedPowerups: 0,
         };
 
-        state.revealed[1][1] = 0;
-        revealAround(state, 1, 1);
-        state.footprints.add('1,1');
-        state.visited.add('1,1');
+        revealAround(state, state.px, state.py);
+        state.footprints.add(state.px + ',' + state.py);
+        state.visited.add(state.px + ',' + state.py);
         placePowerups(state);
         return state;
     }
@@ -203,7 +206,7 @@
         const candidates = [];
         for (let y = 2; y < m.h - 2; y++) {
             for (let x = 2; x < m.w - 2; x++) {
-                if (m.grid[y][x] === PATH && Math.abs(x - 1) + Math.abs(y - 1) >= 5) {
+                if (m.grid[y][x] === PATH && Math.abs(x - state.px) + Math.abs(y - state.py) >= 5) {
                     candidates.push({x, y});
                 }
             }
@@ -321,7 +324,7 @@
             if (p.x === state.px && p.y === state.py) {
                 const type = p.type;
                 if (type === 'bonus') {
-                    state.score += PU_POINTS.bonus;
+                    state.score += BONUS_POINTS;
                 } else if (type === 'xray') {
                     revealArea(state, state.px, state.py, 4);
                 } else {
@@ -358,9 +361,9 @@
         if (!state.visited.has(key)) {
             state.visited.add(key);
             state.score += CELL_POINTS;
-            return true;
+        } else {
+            state.score = Math.max(0, state.score - REVISIT_PENALTY);
         }
-        return false;
     }
 
     function canMove(state, dx, dy) {
@@ -419,12 +422,10 @@
     const inputWidth = $('#input-width');
     const inputHeight = $('#input-height');
 
-    let gameId = null;
     let moving = false;
     let tickInterval = null;
     let state = null;
     let paused = false;
-    let prevPups = 0;
     let enemyEls = [];
 
     function cellSize() {
@@ -459,7 +460,7 @@
         }
     }
 
-    const PU_NAMES = {vision: '◉ VISION', freeze: '✱ FREEZE', xray: 'Ω X-RAY', bonus: '★ +100 PTS', away: '⇐ AWAY'};
+    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', away: 'REPEL'};
     let collectTimeout = null;
 
     function showCollectPopup(type) {
@@ -476,6 +477,39 @@
         const area = document.querySelector('.game-area');
         area.classList.add('shake');
         setTimeout(() => area.classList.remove('shake'), 500);
+    }
+
+    function flashScreen() {
+        const flash = document.createElement('div');
+        flash.className = 'screen-flash';
+        document.querySelector('.game-area').appendChild(flash);
+        setTimeout(() => flash.remove(), 260);
+    }
+
+    function isNearEnemy() {
+        return state.enemies.some(e => Math.abs(e.x - state.px) + Math.abs(e.y - state.py) <= 4);
+    }
+
+    function updateThreatState() {
+        if (isNearEnemy() && !state.dead && !state.won) {
+            playerEl.classList.add('near-enemy');
+            if (!playerEl.dataset.alerted) {
+                sfxAlert();
+                playerEl.dataset.alerted = '1';
+            }
+        } else {
+            playerEl.classList.remove('near-enemy');
+            delete playerEl.dataset.alerted;
+        }
+    }
+
+    function applyEnemyPositions() {
+        const cs = cellSize();
+        for (let i = 0; i < state.enemies.length; i++) {
+            if (enemyEls[i]) {
+                enemyEls[i].style.transform = `translate(${state.enemies[i].x * cs}px, ${state.enemies[i].y * cs}px)`;
+            }
+        }
     }
 
     function renderMaze() {
@@ -535,24 +569,11 @@
         for (const [type, remaining] of Object.entries(state.effects)) {
             const badge = document.createElement('div');
             badge.className = 'effect-badge effect-' + type;
-            badge.textContent = type.toUpperCase() + ' ' + remaining;
+            badge.textContent = (PU_NAMES[type] || type.toUpperCase()) + ' ' + remaining;
             effectsBar.appendChild(badge);
         }
 
-        let nearEnemy = false;
-        for (const e of state.enemies) {
-            if (Math.abs(e.x - state.px) + Math.abs(e.y - state.py) <= 4) {
-                nearEnemy = true;
-                break;
-            }
-        }
-        if (nearEnemy && !state.dead && !state.won) {
-            playerEl.classList.add('near-enemy');
-            if (!playerEl.dataset.alerted) { sfxAlert(); playerEl.dataset.alerted = '1'; }
-        } else {
-            playerEl.classList.remove('near-enemy');
-            delete playerEl.dataset.alerted;
-        }
+        updateThreatState();
 
         if (state.dead) {
             deathMoves.textContent = state.moveCount;
@@ -602,12 +623,7 @@
         containerEl.style.transform = `translate(${tx}px, ${ty}px)`;
         playerEl.style.transform = `translate(${state.px * cs}px, ${state.py * cs}px)`;
 
-        for (let i = 0; i < state.enemies.length; i++) {
-            const e = state.enemies[i];
-            if (enemyEls[i]) {
-                enemyEls[i].style.transform = `translate(${e.x * cs}px, ${e.y * cs}px)`;
-            }
-        }
+        applyEnemyPositions();
     }
 
     // ─── Game Loop ────────────────────────────────────────────────────────
@@ -616,26 +632,8 @@
         tickInterval = setInterval(() => {
             if (!state || paused) return;
             tickEnemies(state);
-            const cs = cellSize();
-            for (let i = 0; i < state.enemies.length; i++) {
-                if (enemyEls[i]) {
-                    enemyEls[i].style.transform = `translate(${state.enemies[i].x * cs}px, ${state.enemies[i].y * cs}px)`;
-                }
-            }
-            let nearEnemy = false;
-            for (const e of state.enemies) {
-                if (Math.abs(e.x - state.px) + Math.abs(e.y - state.py) <= 4) {
-                    nearEnemy = true;
-                    break;
-                }
-            }
-            if (nearEnemy && !state.dead && !state.won) {
-                playerEl.classList.add('near-enemy');
-                if (!playerEl.dataset.alerted) { sfxAlert(); playerEl.dataset.alerted = '1'; }
-            } else {
-                playerEl.classList.remove('near-enemy');
-                delete playerEl.dataset.alerted;
-            }
+            applyEnemyPositions();
+            updateThreatState();
             if (state.dead || state.won) renderMaze();
         }, 600);
     }
@@ -647,8 +645,6 @@
     function newGame(width, height) {
         initAudio();
         state = createGame(width, height);
-        gameId = state.id;
-        prevPups = state.powerups.length;
         buildGrid();
         renderMaze();
         startTick();
@@ -670,6 +666,7 @@
             const pu = collectPowerup(state);
             if (pu) {
                 showCollectPopup(pu);
+                if (pu === 'xray') flashScreen();
                 sfxCollect();
             } else {
                 sfxStep();
@@ -712,8 +709,7 @@
     };
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'F1' || e.key === 'h' || e.key === 'H') {
-            if (e.key === 'F1') e.preventDefault();
+        if (e.key === 'h' || e.key === 'H') {
             if (!state || state.won || state.dead) return;
             toggleHelp();
             return;
@@ -760,8 +756,9 @@
     document.querySelectorAll('[data-diff]').forEach(btn => {
         btn.addEventListener('click', () => {
             difficulty = btn.dataset.diff;
+            const cfg = DIFFICULTY[difficulty];
             difficultyModal.classList.add('hidden');
-            newGame(71, 41);
+            newGame(cfg.width, cfg.height);
         });
     });
 })();

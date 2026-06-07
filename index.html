@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,7 +37,10 @@
                 <span class="stat-value" id="size">—</span>
             </div>
         </div>
-        <span class="help-hint">F1</span>
+        <button class="help-hint" type="button" aria-label="H Help">
+            <span class="key-main">H</span>
+            <span class="key-fn">HELP</span>
+        </button>
     </header>
 
     <div class="effects-bar" id="effects-bar"></div>
@@ -80,15 +83,15 @@
         <div class="difficulty-options">
             <button class="btn btn-difficulty" data-diff="easy">
                 <span class="diff-name">EASY</span>
-                <span class="diff-desc">chase every 10 ticks</span>
+                <span class="diff-desc">71x41, chase 10</span>
             </button>
             <button class="btn btn-difficulty" data-diff="medium">
                 <span class="diff-name">MEDIUM</span>
-                <span class="diff-desc">chase every 9 ticks</span>
+                <span class="diff-desc">81x51, density 550</span>
             </button>
             <button class="btn btn-difficulty" data-diff="hard">
                 <span class="diff-name">HARD</span>
-                <span class="diff-desc">8 ticks, more enemies</span>
+                <span class="diff-desc">91x61, density 500</span>
             </button>
         </div>
     </div>
@@ -117,26 +120,27 @@
 <div id="help-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-card help-card">
-        <span class="modal-code">MANUAL / F1</span>
+        <span class="modal-code">MANUAL / H</span>
         <h2>Help</h2>
         <div class="help-section">
             <h3>Controls</h3>
             <div class="help-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — move</div>
             <div class="help-row"><kbd>R</kbd> — new maze</div>
-
+            <div class="help-row"><kbd>H</kbd> — help</div>
         </div>
         <div class="help-section">
             <h3>Powerups</h3>
-            <div class="help-row"><span class="pu-icon pu-vision">◉</span> <strong>Vision</strong> — larger visibility for 15 moves</div>
-            <div class="help-row"><span class="pu-icon pu-freeze">✱</span> <strong>Freeze</strong> — stops enemies for 12 moves</div>
-            <div class="help-row"><span class="pu-icon pu-xray">Ω</span> <strong>X-Ray</strong> — reveal a 9x9 area</div>
-            <div class="help-row"><span class="pu-icon pu-bonus">★</span> <strong>Bonus</strong> — plus 100 points</div>
-            <div class="help-row"><span class="pu-icon pu-away">⇐</span> <strong>Away</strong> — enemies retreat for 5 ticks</div>
+            <div class="help-row"><span class="pu-icon pu-vision" aria-hidden="true"></span> <strong>Vision</strong> — larger visibility for 15 moves</div>
+            <div class="help-row"><span class="pu-icon pu-freeze" aria-hidden="true"></span> <strong>Freeze</strong> — stops enemies for 12 moves</div>
+            <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal a 9x9 area</div>
+            <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — plus 100 points</div>
+            <div class="help-row"><span class="pu-icon pu-away" aria-hidden="true"></span> <strong>Repel</strong> — enemies retreat for 5 ticks</div>
         </div>
         <div class="help-section">
             <h3>Scoring</h3>
             <div class="help-row">+10 for each new cell visited</div>
-            <div class="help-row">+100 for a <span class="pu-icon pu-bonus">★</span> bonus pickup</div>
+            <div class="help-row">-1 for stepping on a visited cell</div>
+            <div class="help-row">+100 for a <span class="pu-icon pu-bonus" aria-hidden="true"></span> bonus pickup</div>
         </div>
         <div class="help-section">
             <h3>Goal</h3>
