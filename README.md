@@ -25,8 +25,8 @@ Then open `http://127.0.0.1:8765/`.
 ### Maze generation (`generateMaze`)
 
 - Recursive backtracking on odd-sized grid
-- `WALL = '█'`, `PATH = ' '`, `EXIT = '$'`
-- Extra paths opened (`grid cells / 40` walls removed) for more loops and multiple solutions
+- Internal cell markers are kept in `game.js`; rendering is DOM/CSS, not console text output
+- Extra paths opened (`grid cells / 32` walls removed) for more loops and multiple solutions
 - Start: left side, randomly top `(1,1)` or bottom `(1,h-2)`
 - Exit: right side on the opposite diagonal: `(w-2,h-2)` or `(w-2,1)`
 - Generation uses a short seed code shown in the header and accepted in settings
@@ -34,7 +34,7 @@ Then open `http://127.0.0.1:8765/`.
 
 ### Camera system (`updateCamera`, `applyPositions`)
 
-- Single large maze, Mario-style scrolling
+- Single large maze with side-scrolling camera follow
 - Camera tracks player at ~40% from left, ~50% from top
 - `camX`/`camY` snapped to integer cell positions
 - CSS `transition: transform 0.12s` on `.maze-container` gives smooth cell-by-cell scroll
@@ -73,16 +73,16 @@ score, lives, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, col
 ### Difficulty
 
 Game starts with difficulty selection modal. Stored in `difficulty` variable, affects maze size and enemy behavior.
-`beginner` uses the Easy-sized maze without enemies and does not write to high scores.
+`beginner` uses a smaller test maze without enemies and does not write to high scores.
 
 | Level | Maze size | Patrol density/chase | Hunter density/chase |
 |-------|-----------|----------------------|----------------------|
-| beginner | 71x41 | none | none |
+| beginner | 51x31 | none | none |
 | easy   | 71x41 | 1 per 800 cells / 10 | 1 per 800 cells / 8 |
 | medium | 81x51 | 1 per 700 cells / 9 | 1 per 800 cells / 7 |
 | hard   | 91x61 | 1 per 600 cells / 8 | 1 per 800 cells / 6 |
 
-Chase: every N-th tick, enemy picks direction closest to player (including diagonal).
+Chase: every N-th tick, enemy picks direction closest to player (including diagonal). Hunters add random noise to chase ticks so they feel less perfectly locked on.
 `DIFFICULTY` stores maze size, patrol chase interval, hunter chase interval, and whether enemies are enabled.
 
 ### Enemies (`placeEnemies`, `tickEnemies`)
@@ -93,7 +93,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - Each enemy gets one vertical strip (`minX..maxX`), full height (`minY=0, maxY=maze.h-size`)
 - Spawns at nearest path cell to strip center
 - Random walk with 8 directions, 25% chance to change direction per tick
-- Every `chaseEvery` ticks: picks direction toward player
+- Every `chaseEvery` ticks: picks direction toward player; 2x2 hunters sometimes choose a random direction on chase ticks
 - When `away` effect active: picks direction away from player
 - Enemies avoid overlapping each other while spawning and moving
 - All enemies always move (even off-screen), tick every 600ms
@@ -110,7 +110,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 
 - `PU_DENSITY = 100` — 1 powerup per 100 total cells
 - Key Scan powerups are placed first, at least 2 per key when space allows
-- Torch powerups are placed separately: `keys + 1`, kept away from map edges when space allows
+- Torch powerups are placed separately: `2 * keys`, kept away from map edges when space allows
 - Other types cycle: `vision → freeze → xray → bonus → penalty → away` (`away` is shown to players as Repel)
 - Placed on random `PATH` cells, at least 5 Manhattan distance from start
 - Effects:
@@ -130,6 +130,22 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - `+100` per `bonus` powerup collected
 - `-50` per `penalty` powerup collected; score is clamped at 0
 
+```mermaid
+flowchart TD
+    Step["Player enters a cell"] --> Seen{"Visited before?"}
+    Seen -->|No| NewCell["+10 score"]
+    Seen -->|Yes| Revisit["-1 score, min 0"]
+    NewCell --> Pickup{"Pickup on cell?"}
+    Revisit --> Pickup
+    Pickup -->|Bonus| Bonus["+100 score"]
+    Pickup -->|Penalty| Penalty["-50 score, min 0"]
+    Pickup -->|Key Scan with no hidden key| ScanBonus["+20 score"]
+    Pickup -->|Other / none| ExitCheck["Check exit and keys"]
+    Bonus --> ExitCheck
+    Penalty --> ExitCheck
+    ScanBonus --> ExitCheck
+```
+
 ### High scores
 
 - Stored locally in `localStorage` under `laby.highScores.v1`
@@ -139,23 +155,60 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - After win/death, qualifying runs insert into the table immediately and ask for a 7-character name
 - Name entry uses physical `A-Z` / `0-9` keys, so it works even when the keyboard layout is not English
 - Press `Space` to show scores
-- Press `Z` to reset score tables
+- Hidden service key `Z`: reset score tables
 
 ### UI flow
 
 - **Header**: Moves, Powerups, Keys, Score, Lives, Enemies, Map, Seed, H Help button
-- **R**: opens settings modal (custom maze size and optional seed)
+- **C**: opens custom maze modal (custom size and optional seed)
+- **N**: opens difficulty modal for a new game
 - **WASD / Arrows**: move
 - **H**: opens help
 - **Space**: opens/closes local high scores
-- **Z**: resets local high scores
-- Keyboard controls use physical key codes, so `WASD/R/H/Z` work in non-English layouts
-- Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
-- Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit without enemies; keys are shown and collected during the replay.
+- Keyboard controls use physical key codes, so `WASD/C/N/H/Z` work in non-English layouts
+- Hidden service `Z`: resets local high scores. Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
+- Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit without enemies; keys stay visible during the replay, and the win modal returns after the replay so it can be shown again.
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
 - **Collect popup**: floating powerup name for 2 seconds, centered on screen
 - **Win/Death overlays**: show moves + score, button to restart
+
+```mermaid
+flowchart TD
+    Boot["Open index.html"] --> Difficulty["Difficulty modal"]
+    Difficulty -->|Beginner / Easy / Medium / Hard| Game["Active game"]
+    Game -->|WASD / Arrows| Move["Move player"]
+    Move --> Game
+    Game -->|C| Custom["Custom maze modal"]
+    Custom -->|Generate| Game
+    Custom -->|Cancel / Esc| Game
+    Game -->|N| Difficulty
+    Game -->|H or Help button| Help["Help modal"]
+    Help -->|H / Esc / Resume| Game
+    Game -->|Space| Scores["High scores"]
+    Scores -->|Space / Esc / close| Game
+    Game -->|All keys + exit| Win["Win results"]
+    Win -->|Show short track| Replay["Short-track replay"]
+    Replay -->|Route ends| Win
+    Win -->|New game| Difficulty
+    Game -->|Lives reach 0| Death["Failure results"]
+    Death -->|Try again| Difficulty
+```
+
+```mermaid
+flowchart TD
+    MazeSize["Maze cells = width * height"] --> Keys["Keys = floor(cells / 800), min 1"]
+    MazeSize --> Powerups["Powerups = floor(cells / 100)"]
+    Keys --> KeyScan["Key Scan count = min(2 * keys, total powerups)"]
+    Keys --> Torch["Torch target = 2 * keys"]
+    Powerups --> KeyScan
+    Powerups --> Torch
+    Powerups --> Other["Remaining slots cycle: vision, freeze, xray, bonus, penalty, repel"]
+    Torch --> EdgeRule["Torch candidates avoid map edges by radius + 2 cells"]
+    KeyScan --> Placement["Spread placement avoids keys/start when possible"]
+    EdgeRule --> Placement
+    Other --> Placement
+```
 
 ## Visual style
 
@@ -169,7 +222,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
   - Exit: locked grate before keys, open green pixel door after keys
-  - Powerups: cyan/silver/magenta/gold/red/orange/green/amber pixel module icons
+  - Powerups: high-contrast cyan/silver/magenta/gold/red/orange/green/amber pixel module icons with stronger border and glow
 - Cell size: `--cell-size: 36px` desktop, `25px` mobile
 
 ## Performance notes
@@ -190,7 +243,7 @@ KEY_DENSITY = 800      — keys per total cells
 PENALTY_POINTS = 50    — negative pickup score loss
 KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Scan has no hidden key left to reveal
 HUNTER_DENSITY = 800   — hunters per total cells
-Difficulty: easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6)
+Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6)
 FORGET_THRESHOLD = 7   — fog returns after N moves
 Cell: 36px (desktop) / 25px (mobile)
 Tick: 600ms
@@ -201,6 +254,8 @@ Default maze: 71 x 41
 ## GitHub
 
 This project is a pure static app and is safe to keep in a private GitHub repository. If publishing later, GitHub Pages can serve it directly from the repo root or a `docs/` folder.
+
+See `HOSTING.md` for current practical hosting options and a recommended path.
 
 ## Roadmap Notes
 

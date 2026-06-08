@@ -28,6 +28,7 @@
 
     function sfxStep() { beep(200 + Math.random() * 150, 0.04, 'square', 0.18); }
     function sfxCollect() { beep(900, 0.06, 'square', 0.2); setTimeout(() => beep(1200, 0.08, 'square', 0.18), 60); }
+    function sfxAllKeys() { [0, 85, 170, 255, 340].forEach((d, i) => setTimeout(() => beep([660, 880, 990, 1175, 1320][i], 0.09, 'square', 0.16), d)); }
     function sfxWin() { [0, 80, 160, 240, 320].forEach((d, i) => setTimeout(() => beep(300 + i * 150, 0.1, 'square', 0.18), d)); }
     function sfxDeath() { [0, 90, 180, 270].forEach((d, i) => setTimeout(() => beep(180 - i * 35, 0.15, 'square', 0.2), d)); }
 
@@ -196,7 +197,7 @@
     const KEY_DENSITY = 800;
     const HUNTER_DENSITY = 800;
     const DIFFICULTY = {
-        beginner: {width: 71, height: 41, enemyDensity: 0, chaseEvery: 0, hunterChaseEvery: 0, enemies: false},
+        beginner: {width: 51, height: 31, enemyDensity: 0, chaseEvery: 0, hunterChaseEvery: 0, enemies: false},
         easy:   {width: 71, height: 41, enemyDensity: 800, chaseEvery: 10, hunterChaseEvery: 8},
         medium: {width: 81, height: 51, enemyDensity: 700, chaseEvery: 9, hunterChaseEvery: 7},
         hard:   {width: 91, height: 61, enemyDensity: 600, chaseEvery: 8, hunterChaseEvery: 6},
@@ -249,6 +250,8 @@
             camY: 0,
             totalPowerups: 0,
             collectedPowerups: 0,
+            shortTrackRoute: null,
+            walkableCellCount: null,
         };
 
         revealAround(state, state.px, state.py);
@@ -371,7 +374,7 @@
             c.x >= TORCH_EDGE_MARGIN && c.x < m.w - TORCH_EDGE_MARGIN &&
             c.y >= TORCH_EDGE_MARGIN && c.y < m.h - TORCH_EDGE_MARGIN
         );
-        const torchCount = Math.min(state.totalKeys + 1, count - scanCount, torchCandidates.length);
+        const torchCount = Math.min(state.totalKeys * 2, count - scanCount, torchCandidates.length);
         const torchCells = selectSpreadCells(torchCandidates, torchCount, 12, occupied);
         torchCells.forEach(c => usedCells.add(c.x + ',' + c.y));
         const otherCells = selectSpreadCells(
@@ -536,17 +539,22 @@
                 }
                 e.dir = bestDir;
             } else if (e.ticks % e.chaseEvery === 0) {
-                let bestDir = e.dir;
-                let bestDist = Infinity;
-                for (let d = 0; d < ENEMY_DIRS.length; d++) {
-                    const [ddx, ddy] = ENEMY_DIRS[d];
-                    const nx = e.x + ddx;
-                    const ny = e.y + ddy;
-                    if (nx < e.minX || nx > e.maxX || ny < e.minY || ny > e.maxY) continue;
-                    const dist = Math.abs(nx - state.px) + Math.abs(ny - state.py);
-                    if (dist < bestDist) { bestDist = dist; bestDir = d; }
+                const chaseNoise = e.type === 'hunter' ? 0.45 : 0;
+                if (chaseNoise && rng() < chaseNoise) {
+                    e.dir = Math.floor(rng() * ENEMY_DIRS.length);
+                } else {
+                    let bestDir = e.dir;
+                    let bestDist = Infinity;
+                    for (let d = 0; d < ENEMY_DIRS.length; d++) {
+                        const [ddx, ddy] = ENEMY_DIRS[d];
+                        const nx = e.x + ddx;
+                        const ny = e.y + ddy;
+                        if (nx < e.minX || nx > e.maxX || ny < e.minY || ny > e.maxY) continue;
+                        const dist = Math.abs(nx - state.px) + Math.abs(ny - state.py);
+                        if (dist < bestDist) { bestDist = dist; bestDir = d; }
+                    }
+                    e.dir = bestDir;
                 }
-                e.dir = bestDir;
             } else if (rng() < 0.25) {
                 e.dir = Math.floor(rng() * ENEMY_DIRS.length);
             }
@@ -601,6 +609,7 @@
                     state.invulnerableUntil = Date.now() + HIT_INVULNERABLE_MS;
                     e.inactiveUntil = Date.now() + HIT_RESPAWN_MS;
                     showCollectPopup('LIFE -1');
+                    sfxDeath();
                 }
                 return;
             }
@@ -893,9 +902,11 @@
     }
 
     function buildShortTrackRoute() {
+        if (state.shortTrackRoute) return state.shortTrackRoute;
         const keys = state.keys.map(k => ({x: k.x, y: k.y}));
         const orderedKeys = keys.length <= 10 ? exactKeyOrder(keys) : nearestKeyOrder(keys);
-        return concatRouteSegments([state.maze.startPos, ...orderedKeys, state.maze.exitPos]);
+        state.shortTrackRoute = concatRouteSegments([state.maze.startPos, ...orderedKeys, state.maze.exitPos]);
+        return state.shortTrackRoute;
     }
 
     function drawMinimap() {
@@ -1236,7 +1247,7 @@
         const keyMap = {};
         const torchMap = {};
         const renderKeys = state.showingShortTrack && state.replayKeys ? state.replayKeys : state.keys;
-        const renderCollectedKeys = state.showingShortTrack ? state.replayCollectedKeys : state.collectedKeys;
+        const renderCollectedKeys = state.showingShortTrack ? state.totalKeys : state.collectedKeys;
         state.powerups.forEach(p => { puMap[p.x + ',' + p.y] = p.type; });
         state.torches.forEach(t => { torchMap[t.x + ',' + t.y] = true; });
         renderKeys.forEach(k => {
@@ -1385,6 +1396,20 @@
         playerEl.classList.remove('is-replay-hidden');
     }
 
+    function finishShortTrack() {
+        if (shortTrackTimer) {
+            clearInterval(shortTrackTimer);
+            shortTrackTimer = null;
+        }
+        if (!state) return;
+        state.showingShortTrack = false;
+        state.replayKeys = null;
+        state.replayCollectedKeys = 0;
+        if (trackRunnerEl) trackRunnerEl.classList.add('hidden');
+        playerEl.classList.remove('is-replay-hidden');
+        renderMaze();
+    }
+
     function setTrackRunnerPosition(point) {
         const cs = cellSize();
         setTransform(trackRunnerEl, 'trackRunnerTransform', `translate(${point.x * cs}px, ${point.y * cs}px)`);
@@ -1392,25 +1417,16 @@
         applyPositions();
     }
 
-    function collectReplayKey(point) {
-        if (!state.replayKeys) return;
-        for (const key of state.replayKeys) {
-            if (!key.collected && key.x === point.x && key.y === point.y) {
-                key.collected = true;
-                state.replayCollectedKeys++;
-                break;
-            }
-        }
-    }
-
     function countWalkableCells() {
+        if (state.walkableCellCount !== null) return state.walkableCellCount;
         let count = 0;
         for (let y = 0; y < state.maze.h; y++) {
             for (let x = 0; x < state.maze.w; x++) {
                 if (state.maze.grid[y][x] !== WALL) count++;
             }
         }
-        return count;
+        state.walkableCellCount = count;
+        return state.walkableCellCount;
     }
 
     function updateWinStats() {
@@ -1435,18 +1451,15 @@
         trackRunnerEl.classList.remove('hidden');
         let index = 0;
         revealAroundPermanent(state, route[index].x, route[index].y);
-        collectReplayKey(route[index]);
         renderMaze();
         setTrackRunnerPosition(route[index]);
         shortTrackTimer = setInterval(() => {
             index++;
             if (index >= route.length) {
-                clearInterval(shortTrackTimer);
-                shortTrackTimer = null;
+                finishShortTrack();
                 return;
             }
             revealAroundPermanent(state, route[index].x, route[index].y);
-            collectReplayKey(route[index]);
             renderMaze();
             setTrackRunnerPosition(route[index]);
         }, 55);
@@ -1603,6 +1616,10 @@
             if (keyCollected) {
                 showCollectPopup('KEY ACQUIRED');
                 sfxCollect();
+                if (state.collectedKeys === state.totalKeys) {
+                    showCollectPopup('ALL KEYS');
+                    sfxAllKeys();
+                }
             }
             const pu = collectPowerup(state);
             if (pu) {
@@ -1686,26 +1703,37 @@
             if (e.key === 'Escape') closeScores();
             return;
         }
-        if (e.code === 'KeyH') {
-            if (!state || state.won || state.dead) return;
-            toggleHelp();
-            return;
-        }
         if (!helpModal.classList.contains('hidden')) {
-            if (e.key === 'Escape') toggleHelp();
+            if (e.key === 'Escape' || e.code === 'KeyH') {
+                e.preventDefault();
+                toggleHelp();
+            }
             return;
         }
         if (!settingsModal.classList.contains('hidden')) {
             if (e.key === 'Escape') closeSettings();
             return;
         }
+        if (!difficultyModal.classList.contains('hidden')) return;
+        if (e.code === 'KeyH') {
+            e.preventDefault();
+            toggleHelp();
+            return;
+        }
+        if (e.code === 'KeyN') {
+            e.preventDefault();
+            showDifficulty();
+            return;
+        }
+        if (e.code === 'KeyC') {
+            e.preventDefault();
+            openSettings();
+            return;
+        }
         if (paused) return;
         if (e.code in keyMap) {
             e.preventDefault();
             move(...keyMap[e.code]);
-        } else if (e.code === 'KeyR') {
-            e.preventDefault();
-            openSettings();
         }
     });
 

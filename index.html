@@ -77,7 +77,7 @@
                 <p>Score: <strong id="win-score">0</strong></p>
                 <div class="modal-actions">
                     <button class="btn btn-secondary" id="btn-show-short-track">Show short track</button>
-                    <button class="btn btn-primary" id="btn-new-after-win">New maze</button>
+                    <button class="btn btn-primary" id="btn-new-after-win">New game</button>
                 </div>
             </div>
         </div>
@@ -107,7 +107,7 @@
                 <ol class="score-list" id="score-list"></ol>
                 <div class="score-help" id="score-help">Space: close</div>
                 <div class="modal-actions">
-                    <button class="btn btn-primary" id="btn-new-after-scores" type="button">New maze</button>
+                    <button class="btn btn-primary" id="btn-new-after-scores" type="button">New game</button>
                 </div>
             </div>
         </div>
@@ -122,7 +122,7 @@
         <div class="difficulty-options">
             <button class="btn btn-difficulty" data-diff="beginner">
                 <span class="diff-name">BEGINNER</span>
-                <span class="diff-desc">71x41, no enemies, no records</span>
+                <span class="diff-desc">51x31, no enemies, no records</span>
             </button>
             <button class="btn btn-difficulty" data-diff="easy">
                 <span class="diff-name">EASY</span>
@@ -143,8 +143,8 @@
 <div id="settings-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-card">
-        <span class="modal-code">REBUILD / MAZE</span>
-        <h2>New maze</h2>
+        <span class="modal-code">CUSTOM / MAZE</span>
+        <h2>Custom maze</h2>
         <label>
             Width <span class="hint">(odd, 7-151)</span>
             <input type="number" id="input-width" value="71" min="7" max="151" step="2">
@@ -173,7 +173,8 @@
             <h3>Controls</h3>
             <div class="help-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — move</div>
             <div class="help-shortcuts">
-                <span><kbd>R</kbd> new maze</span>
+                <span><kbd>C</kbd> custom maze</span>
+                <span><kbd>N</kbd> new game</span>
                 <span><kbd>Space</kbd> scores</span>
             </div>
         </div>
