@@ -74,6 +74,7 @@ score, lives, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, col
 
 Game starts with difficulty selection modal. Stored in `difficulty` variable, affects maze size and enemy behavior.
 `beginner` uses a smaller test maze without enemies and does not write to high scores.
+`custom` uses the Custom maze form, clamps each side to 7..151, and does not write to high scores.
 
 | Level | Maze size | Patrol density/chase | Hunter density/chase |
 |-------|-----------|----------------------|----------------------|
@@ -81,6 +82,7 @@ Game starts with difficulty selection modal. Stored in `difficulty` variable, af
 | easy   | 71x41 | 1 per 800 cells / 10 | 1 per 800 cells / 8 |
 | medium | 81x51 | 1 per 700 cells / 9 | 1 per 800 cells / 7 |
 | hard   | 91x61 | 1 per 600 cells / 8 | 1 per 800 cells / 6 |
+| custom | 7..151 per side | Easy rules / no records | Easy rules / no records |
 
 Chase: every N-th tick, enemy picks direction closest to player (including diagonal). Hunters add random noise to chase ticks so they feel less perfectly locked on.
 `DIFFICULTY` stores maze size, patrol chase interval, hunter chase interval, and whether enemies are enabled.
@@ -160,8 +162,9 @@ flowchart TD
 ### UI flow
 
 - **Difficulty screen**: boot/title popup with `LABY`, `ZX-81 LAB UNIT`, and mode selection
+- **Custom** on the difficulty screen opens the Custom maze form before the first game
 - **HUD**: two-cell-high arcade panel with `Score: 00000`, `Moves: 0000`, segmented Lives/Keys/Powerups bars, and H Help button
-- **C**: opens custom maze modal (custom size and optional seed)
+- **C**: opens custom maze modal after a game is already running
 - **N**: opens difficulty modal for a new game
 - **WASD / Arrows**: move
 - **H**: opens help
@@ -245,7 +248,7 @@ KEY_DENSITY = 800      — keys per total cells
 PENALTY_POINTS = 50    — negative pickup score loss
 KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Scan has no hidden key left to reveal
 HUNTER_DENSITY = 800   — hunters per total cells
-Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6)
+Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6), custom (7..151 per side, easy enemy rules, no records)
 FORGET_THRESHOLD = 7   — fog returns after N moves
 Cell: 36px (desktop) / 25px (mobile)
 Tick: 600ms

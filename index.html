@@ -122,6 +122,10 @@
                 <span class="diff-name">HARD</span>
                 <span class="diff-desc">91x61, super aggressive enemies</span>
             </button>
+            <button class="btn btn-difficulty" data-custom-maze="true">
+                <span class="diff-name">CUSTOM</span>
+                <span class="diff-desc">You can create custom maze</span>
+            </button>
         </div>
     </div>
 </div>
@@ -129,7 +133,6 @@
 <div id="settings-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-card">
-        <span class="modal-code">CUSTOM / MAZE</span>
         <h2>Custom maze</h2>
         <label>
             Width <span class="hint">(odd, 7-151)</span>
@@ -153,13 +156,10 @@
 <div id="help-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-card help-card">
-        <span class="modal-code">MANUAL / H</span>
-        <h2>Help</h2>
         <div class="help-section">
             <h3>Controls</h3>
             <div class="help-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — move</div>
             <div class="help-shortcuts">
-                <span><kbd>C</kbd> custom maze</span>
                 <span><kbd>N</kbd> new game</span>
                 <span><kbd>Space</kbd> scores</span>
             </div>
@@ -179,10 +179,10 @@
         </div>
         <div class="help-section">
             <h3>Scoring</h3>
-            <div class="help-row">+10 for each new cell visited</div>
-            <div class="help-row">-1 for stepping on a visited cell</div>
-            <div class="help-row">+100 for a <span class="pu-icon pu-bonus" aria-hidden="true"></span> bonus pickup</div>
-            <div class="help-row">-50 for a <span class="pu-icon pu-penalty" aria-hidden="true"></span> penalty pickup, never below 0</div>
+            <div class="help-row"><span class="score-cell score-cell-new" aria-hidden="true"></span> +10 for each new cell visited</div>
+            <div class="help-row"><span class="score-cell score-cell-visited" aria-hidden="true"></span> -1 for stepping on a visited cell</div>
+            <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> +100 for a bonus pickup</div>
+            <div class="help-row"><span class="pu-icon pu-penalty" aria-hidden="true"></span> -50 for a penalty pickup, never below 0</div>
         </div>
         <div class="help-section">
             <h3>Goal</h3>

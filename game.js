@@ -201,6 +201,7 @@
         easy:   {width: 71, height: 41, enemyDensity: 800, chaseEvery: 10, hunterChaseEvery: 8},
         medium: {width: 81, height: 51, enemyDensity: 700, chaseEvery: 9, hunterChaseEvery: 7},
         hard:   {width: 91, height: 61, enemyDensity: 600, chaseEvery: 8, hunterChaseEvery: 6},
+        custom: {width: 71, height: 41, enemyDensity: 800, chaseEvery: 10, hunterChaseEvery: 8},
     };
     const SCORE_STORAGE_KEY = 'laby.highScores.v1';
     const DEBUG_SNAPSHOT_KEY = 'laby.debugSnapshot.v1';
@@ -1661,8 +1662,18 @@
         inputWidth.focus();
     }
 
+    function openCustomFromDifficulty() {
+        difficultyModal.classList.add('hidden');
+        scoresOverlay.classList.add('hidden');
+        openSettings();
+    }
+
     function closeSettings() {
         settingsModal.classList.add('hidden');
+        if (!state) {
+            showDifficulty();
+            return;
+        }
         if (helpModal.classList.contains('hidden') && scoresOverlay.classList.contains('hidden')) setPaused(false);
     }
 
@@ -1726,7 +1737,13 @@
             if (e.key === 'Escape') closeSettings();
             return;
         }
-        if (!difficultyModal.classList.contains('hidden')) return;
+        if (!difficultyModal.classList.contains('hidden')) {
+            if (e.code === 'KeyC') {
+                e.preventDefault();
+                openCustomFromDifficulty();
+            }
+            return;
+        }
         if (e.code === 'KeyH') {
             e.preventDefault();
             toggleHelp();
@@ -1767,7 +1784,8 @@
         inputWidth.value = w;
         inputHeight.value = h;
         const seed = inputSeed.value || makeSeed();
-        closeSettings();
+        difficulty = 'custom';
+        settingsModal.classList.add('hidden');
         newGame(w, h, seed);
     });
 
@@ -1787,6 +1805,9 @@
             newGame(cfg.width, cfg.height);
         });
     });
+
+    const customMazeButton = $('[data-custom-maze]');
+    if (customMazeButton) customMazeButton.addEventListener('click', openCustomFromDifficulty);
 
     document.querySelectorAll('[data-score-tab]').forEach(btn => {
         btn.addEventListener('click', () => {
