@@ -29,7 +29,7 @@ Then open `http://127.0.0.1:8765/`.
 - Extra paths opened (`grid cells / 32` walls removed) for more loops and multiple solutions
 - Start: left side, randomly top `(1,1)` or bottom `(1,h-2)`
 - Exit: right side on the opposite diagonal: `(w-2,h-2)` or `(w-2,1)`
-- Generation uses a short seed code shown in the header and accepted in settings
+- Generation uses a short seed code accepted in settings and shown on win/death results
 - Default: 71x41, configurable up to 151x151
 
 ### Camera system (`updateCamera`, `applyPositions`)
@@ -159,7 +159,8 @@ flowchart TD
 
 ### UI flow
 
-- **Header**: Moves, Powerups, Keys, Score, Lives, Enemies, Map, Seed, H Help button
+- **Difficulty screen**: boot/title popup with `LABY`, `ZX-81 LAB UNIT`, and mode selection
+- **HUD**: two-cell-high arcade panel with `Score: 00000`, `Moves: 0000`, segmented Lives/Keys/Powerups bars, and H Help button
 - **C**: opens custom maze modal (custom size and optional seed)
 - **N**: opens difficulty modal for a new game
 - **WASD / Arrows**: move
@@ -167,7 +168,7 @@ flowchart TD
 - **Space**: opens/closes local high scores
 - Keyboard controls use physical key codes, so `WASD/C/N/H/Z` work in non-English layouts
 - Hidden service `Z`: resets local high scores. Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
-- Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit without enemies; keys stay visible during the replay, and the win modal returns after the replay so it can be shown again.
+- Win/death results show the seed. Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit without enemies; keys stay visible during the replay, and the win modal returns after the replay so it can be shown again.
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
 - **Collect popup**: floating powerup name for 2 seconds, centered on screen
@@ -219,6 +220,7 @@ flowchart TD
   - Player: `#ffff00` (yellow) glow
   - Patrols: `#ff0000` (red) 3x3 blocks with eyes
   - Hunters: cyan/magenta 2x2 scanner drones
+  - HUD: compact two-row arcade panel, score/moves text plus segmented Lives/Keys/Powerups bars
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
   - Exit: locked grate before keys, open green pixel door after keys

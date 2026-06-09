@@ -740,21 +740,21 @@
     const trackRunnerEl = $('#track-runner');
     const minimapEl = $('#minimap');
     const movesEl = $('#moves');
-    const sizeEl = $('#size');
     const scoreEl = $('#score');
-    const livesEl = $('#lives');
-    const enemiesEl = $('#enemies');
     const powerupsEl = $('#powerups');
+    const powerupsBarEl = $('#powerups-bar');
     const keysEl = $('#keys');
-    const seedEl = $('#seed');
-    const effectsBar = $('#effects-bar');
+    const livesBarEl = $('#lives-bar');
+    const keysBarEl = $('#keys-bar');
     const collectPopup = $('#collect-popup');
     const winOverlay = $('#win-overlay');
     const winMoves = $('#win-moves');
     const winShortMoves = $('#win-short-moves');
     const winVisited = $('#win-visited');
+    const winSeed = $('#win-seed');
     const deathOverlay = $('#death-overlay');
     const deathMoves = $('#death-moves');
+    const deathSeed = $('#death-seed');
     const scoresOverlay = $('#scores-overlay');
     const scoreListEl = $('#score-list');
     const scoreHelpEl = $('#score-help');
@@ -788,6 +788,24 @@
 
     function cellSize() {
         return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
+    }
+
+    function padStat(value, size) {
+        return String(Math.max(0, value)).padStart(size, '0').slice(-size);
+    }
+
+    function renderSegmentBar(el, total, filled) {
+        if (!el) return;
+        const safeTotal = Math.max(0, total);
+        const safeFilled = Math.max(0, Math.min(filled, safeTotal));
+        let html = '';
+        for (let i = 0; i < safeTotal; i++) {
+            html += '<span class="hud-cell' + (i < safeFilled ? ' is-filled' : '') + '"></span>';
+        }
+        if (el.dataset.html !== html) {
+            el.dataset.html = html;
+            el.innerHTML = html;
+        }
     }
 
     function setText(el, value) {
@@ -1304,26 +1322,19 @@
         updateCamera(state);
         applyPositions();
 
-        setText(movesEl, state.moveCount);
-        setText(sizeEl, m.w + '\u00d7' + m.h);
-        setText(scoreEl, state.score);
-        setText(livesEl, state.lives);
-        setText(enemiesEl, state.enemies.length);
+        setText(movesEl, padStat(state.moveCount, 4));
+        setText(scoreEl, padStat(state.score, 5));
         setText(powerupsEl, state.collectedPowerups + '/' + state.totalPowerups);
         setText(keysEl, renderCollectedKeys + '/' + state.totalKeys);
-        setText(seedEl, state.seed);
+        renderSegmentBar(livesBarEl, START_LIVES, state.lives);
+        renderSegmentBar(keysBarEl, state.totalKeys, renderCollectedKeys);
+        renderSegmentBar(powerupsBarEl, state.totalPowerups, state.collectedPowerups);
 
-        effectsBar.innerHTML = '';
-        for (const [type, remaining] of Object.entries(state.effects)) {
-            const badge = document.createElement('div');
-            badge.className = 'effect-badge effect-' + type;
-            badge.textContent = (PU_NAMES[type] || type.toUpperCase()) + ' ' + remaining;
-            effectsBar.appendChild(badge);
-        }
         if (state.dead) {
             deathMoves.textContent = state.moveCount;
             const el = $('#death-score');
             if (el) el.textContent = state.score;
+            if (deathSeed) deathSeed.textContent = state.seed;
             deathOverlay.classList.remove('hidden');
             setPaused(true);
             if (!state.deathHandled) {
@@ -1340,6 +1351,7 @@
             winMoves.textContent = state.moveCount;
             const el = $('#win-score');
             if (el) el.textContent = state.score;
+            if (winSeed) winSeed.textContent = state.seed;
             updateWinStats();
             if (state.showingShortTrack) winOverlay.classList.add('hidden');
             else winOverlay.classList.remove('hidden');

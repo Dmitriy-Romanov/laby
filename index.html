@@ -4,49 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LABY — Maze Game</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260609-hud2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="app">
     <header class="header">
-        <div class="brand">
-            <span class="brand-kicker">ZX-81 LAB UNIT</span>
-            <h1 class="logo">LABY</h1>
-        </div>
-        <div class="stats">
-            <div class="stat">
-                <span class="stat-label">Moves</span>
-                <span class="stat-value" id="moves">0</span>
+        <div class="hud-main" aria-label="Game status">
+            <div class="hud-row">
+                <div class="hud-counter hud-score">Score: <span id="score">00000</span></div>
+                <div class="hud-meter hud-meter-lives">
+                    <span class="hud-meter-label">Lives</span>
+                    <div class="hud-segments" id="lives-bar" aria-label="Lives"></div>
+                </div>
+                <div class="hud-meter hud-meter-keys">
+                    <span class="hud-meter-label">Keys <span id="keys">0/0</span></span>
+                    <div class="hud-segments" id="keys-bar" aria-label="Keys"></div>
+                </div>
             </div>
-            <div class="stat">
-                <span class="stat-label">Powerups</span>
-                <span class="stat-value" id="powerups">0/0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Keys</span>
-                <span class="stat-value" id="keys">0/0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Score</span>
-                <span class="stat-value" id="score">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Lives</span>
-                <span class="stat-value" id="lives">5</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Enemies</span>
-                <span class="stat-value" id="enemies">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Map</span>
-                <span class="stat-value" id="size">—</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Seed</span>
-                <span class="stat-value stat-seed" id="seed">—</span>
+            <div class="hud-row">
+                <div class="hud-counter hud-moves">Moves: <span id="moves">0000</span></div>
+                <div class="hud-meter hud-meter-powerups">
+                    <span class="hud-meter-label">Powerups <span id="powerups">0/0</span></span>
+                    <div class="hud-segments hud-powerups-bar" id="powerups-bar" aria-label="Powerups collected"></div>
+                </div>
             </div>
         </div>
         <button class="help-hint" type="button" aria-label="H Help">
@@ -54,8 +36,6 @@
             <span class="key-fn">HELP</span>
         </button>
     </header>
-
-    <div class="effects-bar" id="effects-bar"></div>
 
     <div id="collect-popup" class="collect-popup hidden"></div>
 
@@ -75,6 +55,7 @@
                 <p>Short track: <strong id="win-short-moves">0</strong></p>
                 <p>Visited: <strong id="win-visited">0/0</strong> cells</p>
                 <p>Score: <strong id="win-score">0</strong></p>
+                <p>Seed: <strong id="win-seed">—</strong></p>
                 <div class="modal-actions">
                     <button class="btn btn-secondary" id="btn-show-short-track">Show short track</button>
                     <button class="btn btn-primary" id="btn-new-after-win">New game</button>
@@ -88,6 +69,7 @@
                 <h2>Signal lost</h2>
                 <p>Enemy contact after <strong id="death-moves">0</strong> moves</p>
                 <p>Score: <strong id="death-score">0</strong></p>
+                <p>Seed: <strong id="death-seed">—</strong></p>
                 <button class="btn btn-primary" id="btn-new-after-death">Try again</button>
             </div>
         </div>
@@ -118,6 +100,10 @@
     <div class="modal-backdrop"></div>
     <div class="modal-card difficulty-card">
         <span class="modal-code">BOOT / DIFFICULTY</span>
+        <div class="title-lockup" aria-label="LABY">
+            <span class="title-kicker">ZX-81 LAB UNIT</span>
+            <h1>LABY</h1>
+        </div>
         <h2>Select mode</h2>
         <div class="difficulty-options">
             <button class="btn btn-difficulty" data-diff="beginner">
@@ -209,6 +195,6 @@
     </div>
 </div>
 
-<script src="game.js"></script>
+<script src="game.js?v=20260609-hud2"></script>
 </body>
 </html>

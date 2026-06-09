@@ -59,15 +59,16 @@ body::before {
     height: 100vh;
     width: 100vw;
     padding: 18px 24px 22px;
-    gap: 10px;
+    gap: 8px;
 }
 
 .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 12px;
+    min-height: calc(var(--cell-size) * 2);
+    padding: 7px 12px;
     background:
         linear-gradient(90deg, #0000cd 0 4px, transparent 4px) 0 0 / 18px 100%,
         var(--surface-2);
@@ -80,82 +81,122 @@ body::before {
         inset 0 -2px 0 #0000cd;
 }
 
-.brand {
+.hud-main {
     display: grid;
-    gap: 2px;
-    min-width: 118px;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px;
+    min-width: 0;
 }
 
-.brand-kicker {
-    color: #00ffff;
-    font-size: 0.9rem;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.logo {
-    font-family: 'Bitcount Prop Single', monospace;
-    font-size: 2.55rem;
-    line-height: 0.9;
-    font-weight: 700;
-    color: #ffff00;
-    letter-spacing: 0;
-    white-space: nowrap;
-    text-shadow: 3px 3px 0 #ff0000, 0 0 16px rgba(255, 255, 0, 0.55);
-}
-
-.stats {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(70px, 1fr));
-    gap: 6px;
-    align-items: center;
-    width: min(980px, 100%);
-}
-
-.stat {
-    display: grid;
-    gap: 2px;
-    min-height: 50px;
-    padding: 6px 10px 7px;
-    background: #000000;
-    border: 1px solid #0000ff;
-    box-shadow: inset 0 0 0 1px rgba(0, 205, 205, 0.28);
-}
-
-.stat-label {
-    font-size: 0.88rem;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0;
-    color: #00ffff;
-}
-
-.stat-value {
-    font-family: 'Bitcount Prop Single', monospace;
-    font-size: 1.55rem;
-    line-height: 1;
-    font-weight: 700;
-    color: #ffff00;
-    text-shadow: 0 0 8px rgba(255, 255, 0, 0.35);
-}
-
-.stat-seed {
-    font-size: 1.05rem;
-}
-
-.effects-bar {
+.hud-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 34px;
-    padding: 0 2px;
-    flex-shrink: 0;
+    gap: clamp(10px, 2vw, 30px);
+    min-width: 0;
 }
 
-.effects-bar:empty::before {
-    content: 'READY > WAITING FOR SIGNAL';
-    color: var(--ink-dim);
-    font-size: 1rem;
+.hud-counter {
+    flex: 0 0 auto;
+    min-width: clamp(150px, 14vw, 260px);
+    color: #cdcdcd;
+    font-size: clamp(1rem, 1.7vw, 1.45rem);
+    line-height: 1;
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+.hud-counter span {
+    color: #ffff00;
+    text-shadow: 0 0 8px rgba(255, 255, 0, 0.45);
+}
+
+.hud-meter {
+    display: grid;
+    grid-template-columns: auto minmax(90px, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.hud-meter-lives {
+    flex: 0 1 260px;
+}
+
+.hud-meter-keys {
+    flex: 0 1 360px;
+}
+
+.hud-meter-powerups {
+    flex: 0 1 560px;
+    max-width: 560px;
+}
+
+.hud-meter-label {
+    color: #00ffff;
+    font-size: clamp(0.95rem, 1.45vw, 1.25rem);
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.hud-meter-label span {
+    color: #ffff00;
+}
+
+.hud-segments {
+    height: clamp(16px, 1.55vw, 22px);
+    min-width: 0;
+    background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.16) 1px, transparent 1px) 0 0 / 10% 100%,
+        #000000;
+    border: 1px solid #cdcdcd;
+    box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 255, 0.7),
+        0 0 8px rgba(0, 205, 205, 0.24);
+}
+
+.hud-segments {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    width: max-content;
+    max-width: 100%;
+}
+
+.hud-cell {
+    flex: 0 0 clamp(17px, 1.55vw, 25px);
+    background: #ff0000;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.hud-powerups-bar {
+    width: clamp(300px, 30vw, 420px);
+}
+
+.hud-powerups-bar .hud-cell {
+    flex: 1 1 0;
+    background: #000000;
+}
+
+.hud-powerups-bar .hud-cell.is-filled {
+    background: #ffff00;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+        0 0 6px rgba(255, 255, 0, 0.38);
+}
+
+.hud-cell.is-filled {
+    background: #ffff00;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+        0 0 6px rgba(255, 255, 0, 0.38);
+}
+
+.hud-meter-keys .hud-cell.is-filled {
+    background: #00ff00;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+        0 0 6px rgba(0, 255, 0, 0.34);
 }
 
 .collect-popup {
@@ -187,42 +228,6 @@ body::before {
 @keyframes pop-out {
     from { opacity: 1; }
     to { opacity: 0; transform: translateY(-6px); }
-}
-
-.effect-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    padding: 4px 10px;
-    font-family: 'Bitcount Prop Single', monospace;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0;
-    animation: effect-in 0.3s ease;
-}
-
-.effect-vision {
-    background: rgba(0, 255, 255, 0.15);
-    border: 1px solid rgba(0, 255, 255, 0.4);
-    color: #00ffff;
-}
-
-.effect-freeze {
-    background: rgba(205, 205, 205, 0.15);
-    border: 1px solid rgba(205, 205, 205, 0.4);
-    color: #cdcdcd;
-}
-
-.effect-away {
-    background: rgba(255, 140, 0, 0.15);
-    border: 1px solid rgba(255, 140, 0, 0.4);
-    color: #ff8c00;
-}
-
-@keyframes effect-in {
-    from { transform: scale(0.8); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
 }
 
 .game-area {
@@ -1003,6 +1008,8 @@ body.is-paused .modal-backdrop {
     font-family: 'Bitcount Prop Single', monospace;
     position: relative;
     display: block;
+    justify-self: end;
+    flex-shrink: 0;
     width: 76px;
     height: 54px;
     padding: 0;
@@ -1019,6 +1026,32 @@ body.is-paused .modal-backdrop {
         3px 3px 0 #0000cd,
         0 0 12px rgba(0, 205, 205, 0.25);
     text-shadow: 2px 2px 0 #1b2430;
+}
+
+@media (max-width: 1380px) {
+    .header {
+        gap: 10px;
+    }
+
+    .hud-row {
+        gap: 12px;
+    }
+
+    .hud-counter {
+        min-width: 122px;
+    }
+
+    .hud-meter-lives {
+        flex-basis: 210px;
+    }
+
+    .hud-meter-keys {
+        flex-basis: 250px;
+    }
+
+    .hud-meter-powerups {
+        flex-basis: 480px;
+    }
 }
 
 .help-hint::before {
@@ -1353,6 +1386,30 @@ kbd {
     width: 90vw;
 }
 
+.title-lockup {
+    margin: 4px 0 22px;
+}
+
+.title-kicker {
+    display: block;
+    color: #00ffff;
+    font-size: 0.9rem;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.title-lockup h1 {
+    margin: 4px 0 0;
+    color: #ffff00;
+    font-size: clamp(3.2rem, 12vw, 6.5rem);
+    line-height: 0.82;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-shadow:
+        4px 4px 0 #ff0000,
+        0 0 18px rgba(255, 255, 0, 0.55);
+}
+
 .difficulty-options {
     display: flex;
     flex-direction: column;
@@ -1404,31 +1461,43 @@ kbd {
     }
     body::before { border-width: 5px; }
     .header {
+        min-height: calc(var(--cell-size) * 2);
+        grid-template-columns: minmax(0, 1fr) 54px;
         align-items: stretch;
-        gap: 10px;
-        padding: 9px;
+        gap: 8px;
+        padding: 5px 8px;
     }
-    .brand {
-        min-width: 78px;
+    .hud-main {
+        gap: 3px;
     }
-    .brand-kicker {
-        font-size: 0.64rem;
+    .hud-row {
+        display: grid;
+        grid-template-columns: minmax(76px, 0.76fr) minmax(0, 1fr);
+        gap: 5px 7px;
     }
-    .logo {
-        font-size: 1.55rem;
-        text-shadow: 2px 2px 0 #ff0000;
+    .hud-row:first-child {
+        grid-template-columns: minmax(76px, 0.76fr) minmax(74px, 0.62fr) minmax(0, 1fr);
     }
-    .stats {
-        grid-template-columns: repeat(4, minmax(54px, 1fr));
-        gap: 5px;
+    .hud-counter {
+        min-width: 0;
+        font-size: 0.62rem;
     }
-    .stat {
-        min-height: 40px;
-        padding: 5px 6px;
+    .hud-meter {
+        grid-template-columns: 1fr;
+        gap: 2px;
     }
-    .stat-label { font-size: 0.68rem; }
-    .stat-value { font-size: 1.05rem; }
-    .stat-seed { font-size: 0.74rem; }
+    .hud-meter-label {
+        font-size: 0.52rem;
+    }
+    .hud-segments {
+        height: 11px;
+    }
+    .hud-powerups-bar {
+        width: 100%;
+    }
+    .hud-cell {
+        flex-basis: 10px;
+    }
     .help-hint {
         width: 54px;
         height: 42px;
@@ -1452,9 +1521,6 @@ kbd {
         right: 6px;
         bottom: 6px;
         font-size: 0.52rem;
-    }
-    .effects-bar:empty::before {
-        font-size: 0.82rem;
     }
     .modal-card {
         width: 90vw;
