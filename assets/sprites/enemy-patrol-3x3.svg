@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108" shape-rendering="crispEdges">
+  <title>Enemy: Patrol - 3x3 cells</title>
+  <rect width="108" height="108" fill="none"/>
+  <rect x="14" y="0" width="80" height="18" fill="#ff0000"/>
+  <rect x="0" y="18" width="108" height="42" fill="#ff0000"/>
+  <rect x="6" y="60" width="96" height="38" fill="#cd0000"/>
+  <rect x="8" y="92" width="24" height="16" fill="#ff0000"/>
+  <rect x="42" y="96" width="24" height="12" fill="#ff0000"/>
+  <rect x="76" y="92" width="24" height="16" fill="#ff0000"/>
+  <rect x="20" y="30" width="20" height="16" fill="#ffff00"/>
+  <rect x="68" y="30" width="20" height="16" fill="#ffff00"/>
+  <rect x="18" y="67" width="10" height="10" fill="#000000"/>
+  <rect x="34" y="67" width="10" height="10" fill="#000000"/>
+  <rect x="50" y="67" width="10" height="10" fill="#000000"/>
+  <rect x="66" y="67" width="10" height="10" fill="#000000"/>
+  <rect x="82" y="67" width="10" height="10" fill="#000000"/>
+</svg>

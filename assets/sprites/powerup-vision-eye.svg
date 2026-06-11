@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" shape-rendering="crispEdges">
+  <title>Powerup: Vision - eye</title>
+  <rect width="36" height="36" fill="none"/>
+  <rect x="8" y="13" width="20" height="2" fill="#00ffff"/>
+  <rect x="5" y="15" width="26" height="3" fill="#00ffff"/>
+  <rect x="3" y="18" width="30" height="3" fill="#00ffff"/>
+  <rect x="5" y="21" width="26" height="3" fill="#00ffff"/>
+  <rect x="8" y="24" width="20" height="2" fill="#00ffff"/>
+  <rect x="14" y="14" width="8" height="10" fill="#000000"/>
+  <rect x="16" y="16" width="5" height="5" fill="#ffffff"/>
+  <rect x="18" y="18" width="3" height="3" fill="#00ffff"/>
+  <rect x="1" y="18" width="2" height="2" fill="#ffffff"/>
+  <rect x="33" y="18" width="2" height="2" fill="#ffffff"/>
+</svg>

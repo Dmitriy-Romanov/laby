@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" shape-rendering="crispEdges">
+  <title>Powerup: Bonus - plus</title>
+  <rect width="36" height="36" fill="none"/>
+  <rect x="4" y="4" width="28" height="28" fill="#00aa00"/>
+  <rect x="7" y="7" width="22" height="22" fill="#00ff00"/>
+  <rect x="16" y="10" width="5" height="16" fill="#ffffff"/>
+  <rect x="10" y="16" width="17" height="5" fill="#ffffff"/>
+  <rect x="8" y="8" width="20" height="2" fill="#aaffaa"/>
+  <rect x="8" y="27" width="20" height="2" fill="#006600"/>
+</svg>

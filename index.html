@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LABY — Maze Game</title>
-    <link rel="stylesheet" href="style.css?v=20260609-hud2">
+    <link rel="stylesheet" href="style.css?v=20260612-one-player">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap" rel="stylesheet">
 </head>
@@ -13,22 +13,14 @@
     <header class="header">
         <div class="hud-main" aria-label="Game status">
             <div class="hud-row">
-                <div class="hud-counter hud-score">Score: <span id="score">00000</span></div>
-                <div class="hud-meter hud-meter-lives">
-                    <span class="hud-meter-label">Lives</span>
-                    <div class="hud-segments" id="lives-bar" aria-label="Lives"></div>
-                </div>
-                <div class="hud-meter hud-meter-keys">
-                    <span class="hud-meter-label">Keys <span id="keys">0/0</span></span>
-                    <div class="hud-segments" id="keys-bar" aria-label="Keys"></div>
-                </div>
+                <div class="hud-counter hud-score"><span class="hud-symbol">$</span><span id="score">00000</span></div>
+                <div class="hud-icons hud-lives" id="lives-bar" aria-label="Lives"></div>
+                <div class="hud-icons hud-keys" id="keys-bar" aria-label="Keys"></div>
             </div>
             <div class="hud-row">
-                <div class="hud-counter hud-moves">Moves: <span id="moves">0000</span></div>
-                <div class="hud-meter hud-meter-powerups">
-                    <span class="hud-meter-label">Powerups <span id="powerups">0/0</span></span>
-                    <div class="hud-segments hud-powerups-bar" id="powerups-bar" aria-label="Powerups collected"></div>
-                </div>
+                <div class="hud-counter hud-moves"><span class="hud-symbol">↦</span><span id="moves">0000</span></div>
+                <div class="hud-counter hud-powerups"><span class="hud-symbol">★</span><span id="powerups">0/0</span></div>
+                <div class="hud-counter hud-dots"><span class="hud-symbol">♦</span><span id="dots">0/0</span></div>
             </div>
         </div>
         <button class="help-hint" type="button" aria-label="H Help">
@@ -56,6 +48,7 @@
                 <p>Visited: <strong id="win-visited">0/0</strong> cells</p>
                 <p>Score: <strong id="win-score">0</strong></p>
                 <p>Seed: <strong id="win-seed">—</strong></p>
+                <div class="score-breakdown" id="win-breakdown"></div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary" id="btn-show-short-track">Show short track</button>
                     <button class="btn btn-primary" id="btn-new-after-win">New game</button>
@@ -70,6 +63,7 @@
                 <p>Enemy contact after <strong id="death-moves">0</strong> moves</p>
                 <p>Score: <strong id="death-score">0</strong></p>
                 <p>Seed: <strong id="death-seed">—</strong></p>
+                <div class="score-breakdown" id="death-breakdown"></div>
                 <button class="btn btn-primary" id="btn-new-after-death">Try again</button>
             </div>
         </div>
@@ -172,6 +166,7 @@
                 <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal 9x9</div>
                 <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — +100 pts</div>
                 <div class="help-row"><span class="pu-icon pu-penalty" aria-hidden="true"></span> <strong>Penalty</strong> — -50 pts</div>
+                <div class="help-row"><span class="pu-icon pu-life" aria-hidden="true"></span> <strong>Life</strong> — +1 life or +40 pts</div>
                 <div class="help-row"><span class="pu-icon pu-away" aria-hidden="true"></span> <strong>Repel</strong> — enemy retreat</div>
                 <div class="help-row"><span class="pu-icon pu-torch" aria-hidden="true"></span> <strong>Torch</strong> — permanent light</div>
                 <div class="help-row"><span class="pu-icon pu-keyscan" aria-hidden="true"></span> <strong>Key Scan</strong> — reveal 1 key or +20 pts</div>

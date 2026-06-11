@@ -113,6 +113,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - `PU_DENSITY = 100` — 1 powerup per 100 total cells
 - Key Scan powerups are placed first, at least 2 per key when space allows
 - Torch powerups are placed separately: `2 * keys`, kept away from map edges when space allows
+- Life powerups are placed separately: `1 * keys`; they restore 1 life up to 5, or give +40 score at full lives
 - Other types cycle: `vision → freeze → xray → bonus → penalty → away` (`away` is shown to players as Repel)
 - Placed on random `PATH` cells, at least 5 Manhattan distance from start
 - Effects:
@@ -121,6 +122,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - `xray` — instant 9x9 reveal around player, cells fade by normal fog rules
   - `bonus` — instant +100 score, no duration
   - `penalty` — instant -50 score, clamped at 0
+  - `life` — instant +1 life, or +40 score when already at 5 lives
   - `away` / **Repel** — enemies flee from player, lasts 5 enemy ticks
   - `torch` — permanently reveals a circular radius-4 area around the pickup cell
   - `keyscan` — permanently reveals one random hidden key; if all keys are already revealed, gives +20 score
@@ -131,6 +133,8 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - `-1` per step onto an already visited cell; score is clamped at 0
 - `+100` per `bonus` powerup collected
 - `-50` per `penalty` powerup collected; score is clamped at 0
+- `+40` per `life` powerup when already at maximum lives
+- Final score adds a one-time bonus up to 10000 points: up to 4000 for remaining lives, up to 4000 for visited walkable cells, and up to 2000 for collected non-penalty powerups. Win/death overlays show the breakdown.
 
 ```mermaid
 flowchart TD
@@ -141,10 +145,12 @@ flowchart TD
     Revisit --> Pickup
     Pickup -->|Bonus| Bonus["+100 score"]
     Pickup -->|Penalty| Penalty["-50 score, min 0"]
+    Pickup -->|Life at max lives| LifeBonus["+40 score"]
     Pickup -->|Key Scan with no hidden key| ScanBonus["+20 score"]
     Pickup -->|Other / none| ExitCheck["Check exit and keys"]
     Bonus --> ExitCheck
     Penalty --> ExitCheck
+    LifeBonus --> ExitCheck
     ScanBonus --> ExitCheck
 ```
 
@@ -154,6 +160,7 @@ flowchart TD
 - Separate TOP-5 tables for `easy`, `medium`, and `hard`
 - Default rows are `PLAYER 0000`
 - Runs are ranked by higher score, then fewer moves
+- Stored run rows include remaining lives
 - After win/death, qualifying runs insert into the table immediately and ask for a 7-character name
 - Name entry uses physical `A-Z` / `0-9` keys, so it works even when the keyboard layout is not English
 - Press `Space` to show scores
@@ -163,7 +170,7 @@ flowchart TD
 
 - **Difficulty screen**: boot/title popup with `LABY`, `ZX-81 LAB UNIT`, and mode selection
 - **Custom** on the difficulty screen opens the Custom maze form before the first game
-- **HUD**: two-cell-high arcade panel with `Score: 00000`, `Moves: 0000`, segmented Lives/Keys/Powerups bars, and H Help button
+- **HUD**: fixed 72px arcade panel with `$ score`, step counter, heart lives, key icons, `★ powerups`, `♦ visited/total`, and H Help button
 - **C**: opens custom maze modal after a game is already running
 - **N**: opens difficulty modal for a new game
 - **WASD / Arrows**: move
@@ -175,7 +182,7 @@ flowchart TD
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
 - **Collect popup**: floating powerup name for 2 seconds, centered on screen
-- **Win/Death overlays**: show moves + score, button to restart
+- **Win/Death overlays**: show moves, score, seed, final bonus breakdown, and restart actions
 
 ```mermaid
 flowchart TD
@@ -247,6 +254,8 @@ EXTRA_PATH_DENSITY = 32 — lower value opens more wall links after maze generat
 KEY_DENSITY = 800      — keys per total cells
 PENALTY_POINTS = 50    — negative pickup score loss
 KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Scan has no hidden key left to reveal
+LIFE_BONUS_POINTS = 40 — score gain when a life pickup is collected at max lives
+FINAL_LIVES_BONUS = 4000, FINAL_DOTS_BONUS = 4000, FINAL_POWERUPS_BONUS = 2000
 HUNTER_DENSITY = 800   — hunters per total cells
 Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6), custom (7..151 per side, easy enemy rules, no records)
 FORGET_THRESHOLD = 7   — fog returns after N moves

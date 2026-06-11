@@ -180,10 +180,14 @@
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
     const BONUS_POINTS = 100;
     const KEY_SCAN_BONUS_POINTS = 20;
+    const LIFE_BONUS_POINTS = 40;
     const PENALTY_POINTS = 50;
     const CELL_POINTS = 10;
     const REVISIT_PENALTY = 1;
     const START_LIVES = 5;
+    const FINAL_LIVES_BONUS = 4000;
+    const FINAL_DOTS_BONUS = 4000;
+    const FINAL_POWERUPS_BONUS = 2000;
     const HIT_RESPAWN_MS = 5000;
     const HIT_INVULNERABLE_MS = 900;
     const ENEMY_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
@@ -251,6 +255,11 @@
             camY: 0,
             totalPowerups: 0,
             collectedPowerups: 0,
+            totalGoodPowerups: 0,
+            collectedGoodPowerups: 0,
+            finalScoreApplied: false,
+            baseScore: 0,
+            finalBonus: null,
             shortTrackRoute: null,
             walkableCellCount: null,
         };
@@ -378,11 +387,19 @@
         const torchCount = Math.min(state.totalKeys * 2, count - scanCount, torchCandidates.length);
         const torchCells = selectSpreadCells(torchCandidates, torchCount, 12, occupied);
         torchCells.forEach(c => usedCells.add(c.x + ',' + c.y));
-        const otherCells = selectSpreadCells(
+        const afterTorchCount = Math.max(0, count - scanCount - torchCount);
+        const lifeCells = selectSpreadCells(
             candidates.filter(c => !usedCells.has(c.x + ',' + c.y)),
-            count - scanCount - torchCount,
+            Math.min(state.totalKeys, afterTorchCount),
             powerupDistance,
             [...occupied, ...torchCells]
+        );
+        lifeCells.forEach(c => usedCells.add(c.x + ',' + c.y));
+        const otherCells = selectSpreadCells(
+            candidates.filter(c => !usedCells.has(c.x + ',' + c.y)),
+            Math.max(0, afterTorchCount - lifeCells.length),
+            powerupDistance,
+            [...occupied, ...torchCells, ...lifeCells]
         );
 
         for (let i = 0; i < scanCount; i++) {
@@ -392,12 +409,16 @@
         for (const c of torchCells) {
             state.powerups.push({x: c.x, y: c.y, type: 'torch'});
         }
+        for (const c of lifeCells) {
+            state.powerups.push({x: c.x, y: c.y, type: 'life'});
+        }
         for (let i = 0; i < otherCells.length; i++) {
             const c = otherCells[i];
             const ptype = PU_TYPES[i % PU_TYPES.length];
             state.powerups.push({x: c.x, y: c.y, type: ptype});
         }
         state.totalPowerups = state.powerups.length;
+        state.totalGoodPowerups = state.powerups.filter(p => p.type !== 'penalty').length;
     }
 
     function effectiveRadius(state) {
@@ -635,12 +656,22 @@
                     state.score += BONUS_POINTS;
                 } else if (type === 'penalty') {
                     state.score = Math.max(0, state.score - PENALTY_POINTS);
+                } else if (type === 'life') {
+                    if (state.lives < START_LIVES) state.lives++;
+                    else {
+                        state.score += LIFE_BONUS_POINTS;
+                        state.powerups.splice(i, 1);
+                        state.collectedPowerups++;
+                        state.collectedGoodPowerups++;
+                        return 'life-bonus';
+                    }
                 } else if (type === 'xray') {
                     revealArea(state, state.px, state.py, 4);
                 } else if (type === 'keyscan') {
                     const result = applyKeyScan(state);
                     state.powerups.splice(i, 1);
                     state.collectedPowerups++;
+                    state.collectedGoodPowerups++;
                     return result === 'score' ? 'keyscan-bonus' : type;
                 } else if (type === 'torch') {
                     state.torches.push({x: p.x, y: p.y});
@@ -650,6 +681,7 @@
                 }
                 state.powerups.splice(i, 1);
                 state.collectedPowerups++;
+                if (type !== 'penalty') state.collectedGoodPowerups++;
                 return type;
             }
         }
@@ -743,8 +775,7 @@
     const movesEl = $('#moves');
     const scoreEl = $('#score');
     const powerupsEl = $('#powerups');
-    const powerupsBarEl = $('#powerups-bar');
-    const keysEl = $('#keys');
+    const dotsEl = $('#dots');
     const livesBarEl = $('#lives-bar');
     const keysBarEl = $('#keys-bar');
     const collectPopup = $('#collect-popup');
@@ -753,9 +784,11 @@
     const winShortMoves = $('#win-short-moves');
     const winVisited = $('#win-visited');
     const winSeed = $('#win-seed');
+    const winBreakdown = $('#win-breakdown');
     const deathOverlay = $('#death-overlay');
     const deathMoves = $('#death-moves');
     const deathSeed = $('#death-seed');
+    const deathBreakdown = $('#death-breakdown');
     const scoresOverlay = $('#scores-overlay');
     const scoreListEl = $('#score-list');
     const scoreHelpEl = $('#score-help');
@@ -795,13 +828,13 @@
         return String(Math.max(0, value)).padStart(size, '0').slice(-size);
     }
 
-    function renderSegmentBar(el, total, filled) {
+    function renderIconBar(el, total, filled, symbol, activeClass) {
         if (!el) return;
         const safeTotal = Math.max(0, total);
         const safeFilled = Math.max(0, Math.min(filled, safeTotal));
         let html = '';
         for (let i = 0; i < safeTotal; i++) {
-            html += '<span class="hud-cell' + (i < safeFilled ? ' is-filled' : '') + '"></span>';
+            html += '<span class="hud-icon ' + (i < safeFilled ? activeClass : '') + '">' + symbol + '</span>';
         }
         if (el.dataset.html !== html) {
             el.dataset.html = html;
@@ -986,7 +1019,7 @@
     }
 
     function defaultScoreEntry() {
-        return {name: 'PLAYER', score: 0, moves: 9999, seed: '', date: ''};
+        return {name: 'PLAYER', score: 0, moves: 9999, lives: 0, seed: '', date: ''};
     }
 
     function defaultScoreTables() {
@@ -1006,6 +1039,7 @@
                 name: String(row.name || 'PLAYER').slice(0, SCORE_NAME_LIMIT).toUpperCase(),
                 score: Math.max(0, parseInt(row.score, 10) || 0),
                 moves: Math.max(0, parseInt(row.moves, 10) || 9999),
+                lives: Math.max(0, Math.min(START_LIVES, parseInt(row.lives, 10) || 0)),
                 seed: String(row.seed || ''),
                 date: String(row.date || ''),
             }));
@@ -1071,10 +1105,12 @@
             const name = document.createElement('span');
             const score = document.createElement('span');
             const moves = document.createElement('span');
+            const lives = document.createElement('span');
             rank.className = 'score-rank';
             name.className = 'score-name';
             score.className = 'score-score';
             moves.className = 'score-moves';
+            lives.className = 'score-lives';
             rank.textContent = index + 1;
             if (isEntry) {
                 name.classList.add('score-input');
@@ -1084,7 +1120,8 @@
             }
             score.textContent = formatScore(row.score);
             moves.textContent = row.score > 0 ? row.moves : '----';
-            li.append(rank, name, score, moves);
+            lives.textContent = row.score > 0 ? '♥' + row.lives : '---';
+            li.append(rank, name, score, moves, lives);
             scoreListEl.appendChild(li);
         });
         if (pendingScoreEntry) {
@@ -1167,6 +1204,7 @@
             name: '',
             score: state.score,
             moves: state.moveCount,
+            lives: state.lives,
             seed: state.seed,
             date: new Date().toISOString(),
             result,
@@ -1218,7 +1256,7 @@
         }
     }
 
-    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY SCAN', 'keyscan-bonus': '+20 PTS'};
+    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', life: 'LIFE', 'life-bonus': '+40 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY SCAN', 'keyscan-bonus': '+20 PTS'};
     let collectTimeout = null;
 
     function showCollectPopup(type) {
@@ -1249,8 +1287,10 @@
         const now = Date.now();
         for (let i = 0; i < state.enemies.length; i++) {
             if (enemyEls[i]) {
-                enemyEls[i].classList.toggle('is-inactive', state.enemies[i].inactiveUntil > now);
-                const transform = `translate(${state.enemies[i].x * cs}px, ${state.enemies[i].y * cs}px)`;
+                const enemy = state.enemies[i];
+                const inactive = enemy.inactiveUntil > now;
+                enemyEls[i].classList.toggle('is-inactive', inactive);
+                const transform = `translate(${enemy.x * cs}px, ${enemy.y * cs}px)`;
                 if (state.enemyTransforms[i] !== transform) {
                     state.enemyTransforms[i] = transform;
                     enemyEls[i].style.transform = transform;
@@ -1261,6 +1301,7 @@
 
     function renderMaze() {
         const m = state.maze;
+        if ((state.dead || state.won) && !state.finalScoreApplied) applyFinalScore();
         const visible = computeVisible(state);
         const puMap = {};
         const keyMap = {};
@@ -1326,16 +1367,16 @@
         setText(movesEl, padStat(state.moveCount, 4));
         setText(scoreEl, padStat(state.score, 5));
         setText(powerupsEl, state.collectedPowerups + '/' + state.totalPowerups);
-        setText(keysEl, renderCollectedKeys + '/' + state.totalKeys);
-        renderSegmentBar(livesBarEl, START_LIVES, state.lives);
-        renderSegmentBar(keysBarEl, state.totalKeys, renderCollectedKeys);
-        renderSegmentBar(powerupsBarEl, state.totalPowerups, state.collectedPowerups);
+        setText(dotsEl, state.visited.size + '/' + countWalkableCells());
+        renderIconBar(livesBarEl, START_LIVES, state.lives, '♥', 'is-life-on');
+        renderIconBar(keysBarEl, state.totalKeys, renderCollectedKeys, '⚿', 'is-key-on');
 
         if (state.dead) {
             deathMoves.textContent = state.moveCount;
             const el = $('#death-score');
             if (el) el.textContent = state.score;
             if (deathSeed) deathSeed.textContent = state.seed;
+            renderFinalBreakdown(deathBreakdown);
             deathOverlay.classList.remove('hidden');
             setPaused(true);
             if (!state.deathHandled) {
@@ -1354,6 +1395,7 @@
             if (el) el.textContent = state.score;
             if (winSeed) winSeed.textContent = state.seed;
             updateWinStats();
+            renderFinalBreakdown(winBreakdown);
             if (state.showingShortTrack) winOverlay.classList.add('hidden');
             else winOverlay.classList.remove('hidden');
             setPaused(true);
@@ -1440,6 +1482,42 @@
         }
         state.walkableCellCount = count;
         return state.walkableCellCount;
+    }
+
+    function computeFinalBonus() {
+        const walkable = countWalkableCells();
+        const livesBonus = Math.round(FINAL_LIVES_BONUS * (state.lives / START_LIVES));
+        const dotsBonus = walkable > 0 ? Math.round(FINAL_DOTS_BONUS * (state.visited.size / walkable)) : 0;
+        const powerupsBonus = state.totalGoodPowerups > 0 ?
+            Math.round(FINAL_POWERUPS_BONUS * (state.collectedGoodPowerups / state.totalGoodPowerups)) : 0;
+        return {
+            livesBonus,
+            dotsBonus,
+            powerupsBonus,
+            total: livesBonus + dotsBonus + powerupsBonus,
+            walkable,
+        };
+    }
+
+    function applyFinalScore() {
+        if (state.finalScoreApplied) return;
+        state.baseScore = state.score;
+        state.finalBonus = computeFinalBonus();
+        state.score += state.finalBonus.total;
+        state.finalScoreApplied = true;
+    }
+
+    function renderFinalBreakdown(el) {
+        if (!el || !state.finalBonus) return;
+        const b = state.finalBonus;
+        el.innerHTML = [
+            'Game Score: ' + state.baseScore,
+            'Bonuses:',
+            'Lives: +' + b.livesBonus + ' (' + state.lives + '/' + START_LIVES + ')',
+            'Dots: +' + b.dotsBonus + ' (' + state.visited.size + '/' + b.walkable + ')',
+            'Powerups: +' + b.powerupsBonus + ' (' + state.collectedGoodPowerups + '/' + state.totalGoodPowerups + ')',
+            'Total Score = ' + state.score,
+        ].map(line => '<div>' + line + '</div>').join('');
     }
 
     function updateWinStats() {

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72" shape-rendering="crispEdges">
+  <title>Enemy: Hunter - 2x2 cells</title>
+  <rect width="72" height="72" fill="#000000"/>
+  <rect x="31" y="0" width="10" height="72" fill="#00ffff"/>
+  <rect x="0" y="31" width="72" height="10" fill="#00ffff"/>
+  <rect x="34" y="0" width="4" height="72" fill="#ffffff"/>
+  <rect x="0" y="34" width="72" height="4" fill="#ffffff"/>
+  <rect x="0" y="0" width="24" height="24" fill="#ff00ff"/>
+  <rect x="48" y="0" width="24" height="24" fill="#ff00ff"/>
+  <rect x="0" y="48" width="24" height="24" fill="#ff00ff"/>
+  <rect x="48" y="48" width="24" height="24" fill="#ff00ff"/>
+  <rect x="28" y="28" width="16" height="16" fill="#ffff00"/>
+  <rect x="22" y="34" width="6" height="4" fill="#ffffff"/>
+  <rect x="44" y="34" width="6" height="4" fill="#ffffff"/>
+  <rect x="34" y="22" width="4" height="6" fill="#ffffff"/>
+  <rect x="34" y="44" width="4" height="6" fill="#ffffff"/>
+  <rect x="8" y="8" width="8" height="8" fill="#000000"/>
+  <rect x="56" y="8" width="8" height="8" fill="#000000"/>
+  <rect x="8" y="56" width="8" height="8" fill="#000000"/>
+  <rect x="56" y="56" width="8" height="8" fill="#000000"/>
+</svg>
