@@ -265,6 +265,40 @@ Camera: 40% from left, 50% from top
 Default maze: 71 x 41
 ```
 
+## Project Helper
+
+Run:
+
+```sh
+./laby.sh
+```
+
+Direct commands:
+
+```sh
+./laby.sh 1        # check JavaScript syntax
+./laby.sh 2        # check SVG XML syntax
+./laby.sh 3        # run all checks
+./laby.sh status   # show git status
+./laby.sh branches # show branches and recent commits
+```
+
+Menu actions:
+
+- check JavaScript syntax
+- check SVG XML syntax when `xmllint` is available
+- run all checks
+- commit all local changes and push them to GitHub
+- pull the latest `origin/current-branch` with `--ff-only`
+- show git status
+- start a local static server on `http://127.0.0.1:8081`
+- list editable SVG sprites in `assets/sprites`
+- show branches plus recent commit graph
+- create and switch to a new branch for experiments
+- switch back to `main`
+
+The helper does not merge branches. Experimental work should stay isolated until changes are reviewed manually.
+
 ## GitHub
 
 This project is a pure static app and is safe to keep in a private GitHub repository. If publishing later, GitHub Pages can serve it directly from the repo root or a `docs/` folder.
