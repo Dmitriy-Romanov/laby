@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LABY — Maze Game</title>
-    <link rel="stylesheet" href="style.css?v=20260612-code-quality">
+    <link rel="stylesheet" href="style.css?v=20260612-hud-digits">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap" rel="stylesheet">
 </head>
@@ -13,14 +13,14 @@
     <header class="header">
         <div class="hud-main" aria-label="Game status">
             <div class="hud-row">
-                <div class="hud-counter hud-score"><span class="hud-symbol">$</span><span id="score">00000</span></div>
+                <div class="hud-counter hud-score"><span class="hud-symbol">$</span><span id="score"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
                 <div class="hud-icons hud-lives" id="lives-bar" aria-label="Lives"></div>
                 <div class="hud-icons hud-keys" id="keys-bar" aria-label="Keys"></div>
             </div>
             <div class="hud-row">
-                <div class="hud-counter hud-moves"><span class="hud-symbol">↦</span><span id="moves">0000</span></div>
-                <div class="hud-counter hud-powerups"><span class="hud-symbol">★</span><span id="powerups">0/0</span></div>
-                <div class="hud-counter hud-dots"><span class="hud-symbol">♦</span><span id="dots">0/0</span></div>
+                <div class="hud-counter hud-moves"><span class="hud-symbol">↦</span><span id="moves"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
+                <div class="hud-counter hud-powerups"><span class="hud-symbol">★</span><span id="powerups"><span class="stat-d">0</span><span class="stat-sep">/</span><span class="stat-d">0</span></span></div>
+                <div class="hud-counter hud-dots"><span class="hud-symbol">♦</span><span id="dots"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-sep">/</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
             </div>
         </div>
         <button class="help-hint" type="button" aria-label="H Help">
@@ -80,7 +80,7 @@
                     <button class="score-tab" type="button" data-score-tab="hard">Hard</button>
                 </div>
                 <ol class="score-list" id="score-list"></ol>
-                <div class="score-help" id="score-help">Space: close</div>
+                <div class="score-help" id="score-help"></div>
                 <div class="modal-actions">
                     <button class="btn btn-primary" id="btn-new-after-scores" type="button">New game</button>
                 </div>
@@ -189,6 +189,6 @@
     </div>
 </div>
 
-<script src="game.js?v=20260612-code-quality"></script>
+<script src="game.js?v=20260612-hud-digits"></script>
 </body>
 </html>

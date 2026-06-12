@@ -579,8 +579,17 @@
                 e.dir = Math.floor(rng() * ENEMY_DIRS.length);
             }
             const [dx, dy] = ENEMY_DIRS[e.dir];
-            const nx = e.x + dx;
-            const ny = e.y + dy;
+            let nx = e.x + dx;
+            let ny = e.y + dy;
+            if (fleeing) {
+                const nx2 = e.x + dx * 2;
+                const ny2 = e.y + dy * 2;
+                if (nx2 >= e.minX && nx2 <= e.maxX && ny2 >= e.minY && ny2 <= e.maxY &&
+                    canPlaceEnemy(state.enemies, state.enemies.indexOf(e), {...e, x: nx2, y: ny2})) {
+                    nx = nx2;
+                    ny = ny2;
+                }
+            }
             if (nx >= e.minX && nx <= e.maxX && ny >= e.minY && ny <= e.maxY &&
                 canPlaceEnemy(state.enemies, state.enemies.indexOf(e), {...e, x: nx, y: ny})) {
                 e.x = nx;
@@ -829,6 +838,19 @@
 
     function padStat(value, size) {
         return String(Math.max(0, value)).padStart(size, '0').slice(-size);
+    }
+
+    function statDigits(value, size) {
+        const s = padStat(value, size);
+        let html = '';
+        for (let i = 0; i < s.length; i++) {
+            html += '<span class="stat-d">' + s[i] + '</span>';
+        }
+        return html;
+    }
+
+    function statRatio(a, sizeA, b, sizeB) {
+        return statDigits(a, sizeA) + '<span class="stat-sep">/</span>' + statDigits(b, sizeB);
     }
 
     function renderIconBar(el, total, filled, symbol, activeClass) {
@@ -1129,7 +1151,7 @@
         if (pendingScoreEntry) {
             scoreHelpEl.textContent = 'Type name, Enter to save';
         } else {
-            scoreHelpEl.textContent = 'Space: close';
+            scoreHelpEl.textContent = '';
         }
     }
 
@@ -1363,10 +1385,10 @@
         updateCamera(state);
         applyPositions();
 
-        setText(movesEl, padStat(state.moveCount, 4));
-        setText(scoreEl, padStat(state.score, 5));
-        setText(powerupsEl, state.collectedPowerups + '/' + state.totalPowerups);
-        setText(dotsEl, state.visited.size + '/' + countWalkableCells());
+        scoreEl.innerHTML = statDigits(state.score, 5);
+        movesEl.innerHTML = statDigits(state.moveCount, 4);
+        powerupsEl.innerHTML = statRatio(state.collectedPowerups, 2, state.totalPowerups, 2);
+        dotsEl.innerHTML = statRatio(state.visited.size, 3, countWalkableCells(), 3);
         renderIconBar(livesBarEl, START_LIVES, state.lives, '♥', 'is-life-on');
         renderIconBar(keysBarEl, state.totalKeys, renderCollectedKeys, '⚿', 'is-key-on');
 

@@ -102,9 +102,23 @@ body::before {
     min-width: 0;
     color: #cdcdcd;
     font-size: 1.54rem;
+    font-variant-numeric: tabular-nums;
     line-height: 1;
     white-space: nowrap;
     text-transform: uppercase;
+}
+
+.stat-d {
+    display: inline-block;
+    width: 0.72em;
+    text-align: center;
+}
+
+.stat-sep {
+    display: inline-block;
+    width: 0.45em;
+    text-align: center;
+    opacity: 0.6;
 }
 
 .hud-counter span:last-child {
