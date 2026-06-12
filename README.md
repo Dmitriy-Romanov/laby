@@ -117,43 +117,39 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - `PU_DENSITY = 100` — 1 powerup per 100 total cells
 - Key Locate powerups are placed first, at least 2 per key when space allows
 - Torch powerups are placed separately: `2 * keys`, kept away from map edges when space allows
-- Life powerups are placed separately: `1 * keys`; they restore 1 life up to 5, or give +40 score at full lives
-- Other types cycle: `vision → freeze → xray → bonus → penalty → away` (`away` is shown to players as Repel)
+- Life powerups are placed separately: `1 * keys`; they restore 1 life up to 5, or give +4 score at full lives
+- Other types cycle: `vision → freeze → xray → bonus → away` (`away` is shown to players as Repel)
 - Placed on random `PATH` cells, at least 5 Manhattan distance from start
 - Effects:
   - `vision` — circular radius 4 around player, lasts 15 moves
   - `freeze` — stops all enemies, lasts 12 moves
   - `xray` — instant 13x13 reveal around player, cells fade by normal fog rules
-  - `bonus` — instant +100 score, no duration
-  - `penalty` — instant -50 score, clamped at 0
-  - `life` — instant +1 life, or +40 score when already at 5 lives
-  - `away` / **Repel** — enemies flee from player, lasts 5 enemy ticks
+  - `bonus` — instant +10 score, no duration
+  - `life` — instant +1 life, or +4 score when already at 5 lives
+  - `away` / **Repel** — enemies flee from player (2 cells per step), lasts 5 enemy ticks
   - `torch` — permanently reveals a circular radius-4 area around the pickup cell
-  - `keyscan` — shown as Key Locate; permanently reveals one random hidden key; if all keys are already revealed, gives +20 score
+  - `keyscan` — shown as Key Locate; permanently reveals one random hidden key; if all keys are already revealed, gives +2 score
 
 ### Scoring
 
-- `+10` per new cell visited (first time stepping on it)
-- `-1` per step onto an already visited cell; score is clamped at 0
-- `+100` per `bonus` powerup collected
-- `-50` per `penalty` powerup collected; score is clamped at 0
-- `+40` per `life` powerup when already at maximum lives
-- Final score adds a one-time bonus up to 10000 points: up to 4000 for remaining lives, up to 4000 for visited walkable cells, and up to 2000 for collected non-penalty powerups. Win/death overlays show the breakdown.
+- `+1` per new cell visited (first time stepping on it)
+- `+10` per `bonus` powerup collected
+- `+4` per `life` powerup when already at maximum lives
+- Timer starts on first move; time bonus up to 200 points (par: 5 minutes)
+- Final score adds a one-time bonus up to 1000 points: up to 400 for remaining lives, up to 400 for visited walkable cells, up to 200 for collected powerups, and up to 200 for speed. Win/death overlays show the breakdown.
 
 ```mermaid
 flowchart TD
     Step["Player enters a cell"] --> Seen{"Visited before?"}
-    Seen -->|No| NewCell["+10 score"]
-    Seen -->|Yes| Revisit["-1 score, min 0"]
+    Seen -->|No| NewCell["+1 score"]
+    Seen -->|Yes| Skip["no change"]
     NewCell --> Pickup{"Pickup on cell?"}
-    Revisit --> Pickup
-    Pickup -->|Bonus| Bonus["+100 score"]
-    Pickup -->|Penalty| Penalty["-50 score, min 0"]
-    Pickup -->|Life at max lives| LifeBonus["+40 score"]
-    Pickup -->|Key Locate with no hidden key| ScanBonus["+20 score"]
+    Skip --> Pickup
+    Pickup -->|Bonus| Bonus["+10 score"]
+    Pickup -->|Life at max lives| LifeBonus["+4 score"]
+    Pickup -->|Key Locate with no hidden key| ScanBonus["+2 score"]
     Pickup -->|Other / none| ExitCheck["Check exit and keys"]
     Bonus --> ExitCheck
-    Penalty --> ExitCheck
     LifeBonus --> ExitCheck
     ScanBonus --> ExitCheck
 ```
@@ -174,7 +170,7 @@ flowchart TD
 
 - **Difficulty screen**: boot/title popup with `LABY`, `ZX-81 LAB UNIT`, and mode selection
 - **Custom** on the difficulty screen opens the Custom maze form before the first game
-- **HUD**: fixed 72px arcade panel with `$ score`, step counter, heart lives, key icons, `★ powerups`, `♦ visited/total`, and H Help button
+- **HUD**: arcade panel with `$ score`, timer, step counter, heart lives, key icons, `★ powerups`, `♦ visited/total`, and H Help button. 2 rows on desktop, 3 rows on mobile.
 - **C**: opens custom maze modal after a game is already running
 - **N**: opens difficulty modal for a new game
 - **WASD / Arrows**: move
@@ -218,7 +214,7 @@ flowchart TD
     Keys --> Torch["Torch target = 2 * keys"]
     Powerups --> KeyScan
     Powerups --> Torch
-    Powerups --> Other["Remaining slots cycle: vision, freeze, xray, bonus, penalty, repel"]
+    Powerups --> Other["Remaining slots cycle: vision, freeze, xray, bonus, repel"]
     Torch --> EdgeRule["Torch candidates avoid map edges by radius + 2 cells"]
     KeyScan --> Placement["Spread placement avoids keys/start when possible"]
     EdgeRule --> Placement
@@ -240,7 +236,7 @@ flowchart TD
   - Exit: locked grate before keys, open green pixel door after keys
   - Powerups: editable 36x36 SVG icons rendered directly in the cell
   - Keys and lit torches: separate editable map-object SVG sprites
-- Cell size: `--cell-size: 36px` desktop, `25px` mobile
+- Cell size: `--cell-size: 36px` everywhere
 
 ### Editable sprites
 
@@ -268,14 +264,16 @@ The game renders these files directly at their tile size: 36x36 for 1-cell objec
 PU_DENSITY = 100       — powerups per total cells
 EXTRA_PATH_DENSITY = 32 — lower value opens more wall links after maze generation
 KEY_DENSITY = 800      — keys per total cells
-PENALTY_POINTS = 50    — negative pickup score loss
-KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Locate has no hidden key left to reveal
-LIFE_BONUS_POINTS = 40 — score gain when a life pickup is collected at max lives
-FINAL_LIVES_BONUS = 4000, FINAL_DOTS_BONUS = 4000, FINAL_POWERUPS_BONUS = 2000
+CELL_POINTS = 1        — score per new cell visited
+BONUS_POINTS = 10      — score per bonus powerup
+LIFE_BONUS_POINTS = 4   — score per life powerup at max lives
+KEY_SCAN_BONUS_POINTS = 2 — score when Key Locate has no hidden key
+FINAL_LIVES_BONUS = 400, FINAL_DOTS_BONUS = 400, FINAL_POWERUPS_BONUS = 200, TIME_BONUS = 200
+TIME_PAR_SECONDS = 300  — par time for full time bonus (5 minutes)
 HUNTER_DENSITY = 800   — hunters per total cells
 Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6), custom (7..151 odd per side, easy enemy rules, no records)
 FORGET_THRESHOLD = 7   — fog returns after N moves
-Cell: 36px (desktop) / 25px (mobile)
+Cell: 36px everywhere
 Tick: 600ms
 Camera: 40% from left, 50% from top
 Default maze: 71 x 41
