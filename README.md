@@ -26,7 +26,7 @@ Then open `http://127.0.0.1:8765/`.
 ### Maze generation (`generateMaze`)
 
 - Recursive backtracking on odd-sized grid
-- Internal cell markers are kept in `game.js`; rendering is DOM/CSS, not console text output
+- Grid stored as flat `Uint8Array(w * h)` with numeric constants (`WALL=0`, `PATH=1`, `EXIT=2`), accessed via `grid[y * w + x]`
 - Extra paths opened (`grid cells / 32` walls removed) for more loops and multiple solutions
 - Start: left side, randomly top `(1,1)` or bottom `(1,h-2)`
 - Exit: right side on the opposite diagonal: `(w-2,h-2)` or `(w-2,1)`
@@ -58,7 +58,9 @@ Then open `http://127.0.0.1:8765/`.
 Key fields on `state`:
 
 ```
-maze        — {grid[][], w, h, startPos, exitPos}
+maze        — {grid: Uint8Array(w*h), w, h, startPos, exitPos}
+              grid constants: WALL=0, PATH=1, EXIT=2
+              access: grid[y * w + x]
 px, py      — player position (world coords)
 camX, camY  — camera offset in cells
 seed        — current reproducible seed code
@@ -76,7 +78,7 @@ score, lives, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, col
 
 Game starts with difficulty selection modal. Stored in `difficulty` variable, affects maze size and enemy behavior.
 `beginner` uses a smaller test maze without enemies and does not write to high scores.
-`custom` uses the Custom maze form, clamps each side to 7..151, and does not write to high scores.
+`custom` uses the Custom maze form, clamps each side to 7..151 (rounds to odd), and does not write to high scores.
 
 | Level | Maze size | Patrol density/chase | Hunter density/chase |
 |-------|-----------|----------------------|----------------------|
@@ -84,7 +86,7 @@ Game starts with difficulty selection modal. Stored in `difficulty` variable, af
 | easy   | 71x41 | 1 per 800 cells / 10 | 1 per 800 cells / 8 |
 | medium | 81x51 | 1 per 700 cells / 9 | 1 per 800 cells / 7 |
 | hard   | 91x61 | 1 per 600 cells / 8 | 1 per 800 cells / 6 |
-| custom | 7..151 per side | Easy rules / no records | Easy rules / no records |
+| custom | 7..151 per side (odd) | Easy rules / no records | Easy rules / no records |
 
 Chase: every N-th tick, enemy picks direction closest to player (including diagonal). Hunters add random noise to chase ticks so they feel less perfectly locked on.
 `DIFFICULTY` stores maze size, patrol chase interval, hunter chase interval, and whether enemies are enabled.
@@ -271,7 +273,7 @@ KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Locate has no hidden key left
 LIFE_BONUS_POINTS = 40 — score gain when a life pickup is collected at max lives
 FINAL_LIVES_BONUS = 4000, FINAL_DOTS_BONUS = 4000, FINAL_POWERUPS_BONUS = 2000
 HUNTER_DENSITY = 800   — hunters per total cells
-Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6), custom (7..151 per side, easy enemy rules, no records)
+Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6), custom (7..151 odd per side, easy enemy rules, no records)
 FORGET_THRESHOLD = 7   — fog returns after N moves
 Cell: 36px (desktop) / 25px (mobile)
 Tick: 600ms

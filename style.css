@@ -23,6 +23,7 @@
     --cell-size: 36px;
     --radius: 0px;
     --radius-sm: 0px;
+    --font-pixel: 'Bitcount Prop Single', monospace;
 }
 
 html, body {
@@ -1154,9 +1155,6 @@ kbd {
     content: '';
     position: absolute;
     pointer-events: none;
-}
-
-.pu-icon::after {
     inset: 0;
     background-image: var(--pu-sprite);
     background-repeat: no-repeat;

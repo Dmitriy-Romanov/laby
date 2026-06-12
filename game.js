@@ -33,9 +33,9 @@
     function sfxDeath() { [0, 90, 180, 270].forEach((d, i) => setTimeout(() => beep(180 - i * 35, 0.15, 'square', 0.2), d)); }
 
     // ─── Maze Generation ────────────────────────────────────────────────
-    const WALL = '\u2588';
-    const PATH = ' ';
-    const EXIT = '$';
+    const WALL = 0;
+    const PATH = 1;
+    const EXIT = 2;
     let rng = Math.random;
 
     function makeSeed() {
@@ -45,7 +45,8 @@
     function clampMazeSide(value, fallback) {
         const n = parseInt(value, 10);
         if (!Number.isFinite(n)) return fallback;
-        return Math.max(7, Math.min(MAX_CUSTOM_SIDE, n));
+        const clamped = Math.max(7, Math.min(MAX_CUSTOM_SIDE, n));
+        return clamped % 2 === 0 ? clamped + 1 : clamped;
     }
 
     function seedHash(seed) {
@@ -69,11 +70,8 @@
     }
 
     function createMazeGrid(w, h) {
-        const grid = [];
-        for (let y = 0; y < h; y++) {
-            grid[y] = [];
-            for (let x = 0; x < w; x++) grid[y][x] = WALL;
-        }
+        const grid = new Uint8Array(w * h);
+        grid.fill(WALL);
         return grid;
     }
 
@@ -85,7 +83,7 @@
 
         const grid = createMazeGrid(w, h);
         const stack = [{x: 1, y: 1}];
-        grid[1][1] = PATH;
+        grid[1 * w + 1] = PATH;
         const dirs = [[0, 2], [0, -2], [2, 0], [-2, 0]];
 
         while (stack.length > 0) {
@@ -97,9 +95,9 @@
                 const nx = cx + dc;
                 const ny = cy + dr;
                 if (ny > 0 && ny < h - 1 && nx > 0 && nx < w - 1) {
-                    if (grid[ny][nx] === WALL) {
-                        grid[cy + Math.floor(dr / 2)][cx + Math.floor(dc / 2)] = PATH;
-                        grid[ny][nx] = PATH;
+                    if (grid[ny * w + nx] === WALL) {
+                        grid[(cy + Math.floor(dr / 2)) * w + (cx + Math.floor(dc / 2))] = PATH;
+                        grid[ny * w + nx] = PATH;
                         stack.push({x: nx, y: ny});
                         carved = true;
                         break;
@@ -112,23 +110,23 @@
         const startY = rng() < 0.5 ? 1 : h - 2;
         const exitY = startY === 1 ? h - 2 : 1;
         const exitX = w - 2;
-        grid[1][1] = PATH;
-        grid[h - 2][1] = PATH;
-        grid[exitY][exitX] = EXIT;
+        grid[1 * w + 1] = PATH;
+        grid[(h - 2) * w + 1] = PATH;
+        grid[exitY * w + exitX] = EXIT;
 
         const candidates = [];
         for (let y = 2; y < h - 2; y++) {
             for (let x = 2; x < w - 2; x++) {
-                if (grid[y][x] !== WALL) continue;
-                const horiz = grid[y][x - 1] !== WALL && grid[y][x + 1] !== WALL;
-                const vert = grid[y - 1][x] !== WALL && grid[y + 1][x] !== WALL;
+                if (grid[y * w + x] !== WALL) continue;
+                const horiz = grid[y * w + x - 1] !== WALL && grid[y * w + x + 1] !== WALL;
+                const vert = grid[(y - 1) * w + x] !== WALL && grid[(y + 1) * w + x] !== WALL;
                 if (horiz || vert) candidates.push({x, y});
             }
         }
         shuffleArray(candidates);
         const cnt = Math.max(5, Math.floor((w * h) / EXTRA_PATH_DENSITY));
         for (let i = 0; i < Math.min(cnt, candidates.length); i++) {
-            grid[candidates[i].y][candidates[i].x] = PATH;
+            grid[candidates[i].y * w + candidates[i].x] = PATH;
         }
 
         return {grid, w, h, startPos: {x: 1, y: startY}, exitPos: {x: exitX, y: exitY}};
@@ -312,7 +310,7 @@
             let bestX = cx, bestY = cy, bestDist = Infinity;
             for (let y = 1; y < maze.h - 1; y++) {
                 for (let x = xS; x < xE; x++) {
-                    if (maze.grid[y][x] !== WALL) {
+                    if (maze.grid[y * maze.w + x] !== WALL) {
                         const candidate = {x, y, size};
                         if (!canPlaceEnemy(occupied, -1, candidate)) continue;
                         const d = Math.abs(x - cx) + Math.abs(y - cy);
@@ -345,7 +343,7 @@
         const candidates = [];
         for (let y = 2; y < m.h - 2; y++) {
             for (let x = 2; x < m.w - 2; x++) {
-                if (m.grid[y][x] === PATH && Math.abs(x - state.px) + Math.abs(y - state.py) >= 8) {
+                if (m.grid[y * m.w + x] === PATH && Math.abs(x - state.px) + Math.abs(y - state.py) >= 8) {
                     candidates.push({x, y});
                 }
             }
@@ -366,7 +364,7 @@
         const keyCells = new Set(state.keys.map(k => k.x + ',' + k.y));
         for (let y = 2; y < m.h - 2; y++) {
             for (let x = 2; x < m.w - 2; x++) {
-                if (m.grid[y][x] === PATH && !keyCells.has(x + ',' + y) &&
+                if (m.grid[y * m.w + x] === PATH && !keyCells.has(x + ',' + y) &&
                     Math.abs(x - state.px) + Math.abs(y - state.py) >= 5) {
                     candidates.push({x, y});
                 }
@@ -521,7 +519,7 @@
                     revealIfInside(nx - 1, ny);
                     revealIfInside(nx + 1, ny);
                 }
-                if (m.grid[ny][nx] === WALL) break;
+                if (m.grid[ny * m.w + nx] === WALL) break;
             }
         }
     }
@@ -599,7 +597,7 @@
         const m = state.maze;
         for (let y = enemy.minY; y <= enemy.maxY; y++) {
             for (let x = enemy.minX; x <= enemy.maxX; x++) {
-                if (m.grid[y][x] === WALL) continue;
+                if (m.grid[y * m.w + x] === WALL) continue;
                 const candidate = {...enemy, x, y, inactiveUntil: 0};
                 if (!canPlaceEnemy(state.enemies, state.enemies.indexOf(enemy), candidate)) continue;
                 candidates.push({x, y, dist: Math.abs(x - state.px) + Math.abs(y - state.py)});
@@ -734,7 +732,7 @@
         const nx = state.px + dx;
         const ny = state.py + dy;
         if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-            return m.grid[ny][nx] !== WALL;
+            return m.grid[ny * m.w + nx] !== WALL;
         }
         return false;
     }
@@ -787,9 +785,11 @@
     const winShortMoves = $('#win-short-moves');
     const winVisited = $('#win-visited');
     const winSeed = $('#win-seed');
+    const winScoreEl = $('#win-score');
     const winBreakdown = $('#win-breakdown');
     const deathOverlay = $('#death-overlay');
     const deathMoves = $('#death-moves');
+    const deathScoreEl = $('#death-score');
     const deathSeed = $('#death-seed');
     const deathBreakdown = $('#death-breakdown');
     const scoresOverlay = $('#scores-overlay');
@@ -875,7 +875,7 @@
                 const nx = cur.x + dx;
                 const ny = cur.y + dy;
                 if (nx < 0 || nx >= m.w || ny < 0 || ny >= m.h) continue;
-                if (m.grid[ny][nx] === WALL) continue;
+                if (m.grid[ny * m.w + nx] === WALL) continue;
                 const key = nx + ',' + ny;
                 if (prev.has(key)) continue;
                 prev.set(key, cur.x + ',' + cur.y);
@@ -959,7 +959,7 @@
     function buildShortTrackRoute() {
         if (state.shortTrackRoute) return state.shortTrackRoute;
         const keys = state.keys.map(k => ({x: k.x, y: k.y}));
-        const orderedKeys = keys.length <= 10 ? exactKeyOrder(keys) : nearestKeyOrder(keys);
+        const orderedKeys = keys.length <= 10 ? exactKeyOrder(keys) : nearestKeyOrder(keys); // exactKeyOrder: O(2^N * N) memo — safe up to 10 keys
         state.shortTrackRoute = concatRouteSegments([state.maze.startPos, ...orderedKeys, state.maze.exitPos]);
         return state.shortTrackRoute;
     }
@@ -1330,7 +1330,7 @@
                     continue;
                 }
 
-                const ch = m.grid[y][x];
+                const ch = m.grid[y * m.w + x];
                 const isExit = x === m.exitPos.x && y === m.exitPos.y;
                 const pu = puMap[pos];
                 const torch = torchMap[pos];
@@ -1344,13 +1344,8 @@
                     cls += 'cell-powerup-' + pu;
                 } else if (torch) {
                     cls += 'cell-torch';
-                } else if (isVisited) {
-                    cls += 'cell-visited';
-                    if (ch === WALL) cls += ' cell-wall';
-                    else if (isExit) cls += renderCollectedKeys >= state.totalKeys ? ' cell-exit' : ' cell-exit-locked';
-                    else cls += ' cell-path';
-                } else if (isFootprint) {
-                    cls += 'cell-footprint';
+                } else if (isVisited || isFootprint) {
+                    cls += isVisited ? 'cell-visited' : 'cell-footprint';
                     if (ch === WALL) cls += ' cell-wall';
                     else if (isExit) cls += renderCollectedKeys >= state.totalKeys ? ' cell-exit' : ' cell-exit-locked';
                     else cls += ' cell-path';
@@ -1377,8 +1372,7 @@
 
         if (state.dead) {
             deathMoves.textContent = state.moveCount;
-            const el = $('#death-score');
-            if (el) el.textContent = state.score;
+            if (deathScoreEl) deathScoreEl.textContent = state.score;
             if (deathSeed) deathSeed.textContent = state.seed;
             renderFinalBreakdown(deathBreakdown);
             deathOverlay.classList.remove('hidden');
@@ -1395,8 +1389,7 @@
 
         if (state.won) {
             winMoves.textContent = state.moveCount;
-            const el = $('#win-score');
-            if (el) el.textContent = state.score;
+            if (winScoreEl) winScoreEl.textContent = state.score;
             if (winSeed) winSeed.textContent = state.seed;
             updateWinStats();
             renderFinalBreakdown(winBreakdown);
@@ -1481,7 +1474,7 @@
         let count = 0;
         for (let y = 0; y < state.maze.h; y++) {
             for (let x = 0; x < state.maze.w; x++) {
-                if (state.maze.grid[y][x] !== WALL) count++;
+                if (state.maze.grid[y * state.maze.w + x] !== WALL) count++;
             }
         }
         state.walkableCellCount = count;
@@ -1579,10 +1572,10 @@
             for (let x = 0; x < state.maze.w; x++) {
                 const revealedAt = state.revealed[y][x];
                 if (revealedAt === PERMA_VISIBLE) {
-                    permanentCells.push({x, y, ch: state.maze.grid[y][x]});
+                    permanentCells.push({x, y, ch: state.maze.grid[y * state.maze.w + x]});
                 } else if (revealedAt >= 0) {
                     const age = state.moveCount - revealedAt;
-                    const cell = {x, y, ch: state.maze.grid[y][x], revealedAt, age};
+                    const cell = {x, y, ch: state.maze.grid[y * state.maze.w + x], revealedAt, age};
                     if (age <= FORGET_THRESHOLD) recentVisibleCells.push(cell);
                     else staleRevealedCells.push(cell);
                 }
@@ -1611,7 +1604,15 @@
                 h: state.maze.h,
                 startPos: state.maze.startPos,
                 exitPos: state.maze.exitPos,
-                grid: state.maze.grid.map(row => row.join('')),
+                grid: Array.from({length: state.maze.h}, (_, y) => {
+                    const start = y * state.maze.w;
+                    let row = '';
+                    for (let x = 0; x < state.maze.w; x++) {
+                        const v = state.maze.grid[start + x];
+                        row += v === WALL ? '\u2588' : v === EXIT ? '$' : ' ';
+                    }
+                    return row;
+                }),
             },
             visibility: {
                 forgetThreshold: FORGET_THRESHOLD,
@@ -1695,7 +1696,7 @@
     }
 
     function move(dx, dy) {
-        if (!state || moving || paused) return;
+        if (!state || moving || paused || state.dead || state.won) return;
         initAudio();
         moving = true;
 
