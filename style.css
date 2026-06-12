@@ -569,16 +569,8 @@ body.is-paused .modal-backdrop {
     }
 }
 
-.dpad-center {
-    background: rgba(0, 0, 0, 0.6);
-    border-color: #0000ff;
-    color: #cdcdcd;
-    font-size: 0.7rem;
-}
-
 .dpad-up    { grid-column: 2; grid-row: 1; }
 .dpad-left  { grid-column: 1; grid-row: 2; }
-.dpad-center{ grid-column: 2; grid-row: 2; }
 .dpad-right { grid-column: 3; grid-row: 2; }
 .dpad-down  { grid-column: 2; grid-row: 3; }
 

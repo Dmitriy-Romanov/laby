@@ -42,7 +42,7 @@ The maze grid is a **flat `Uint8Array(w * h)`** with numeric constants: `WALL = 
 
 ## Gotchas
 
-- Cell size CSS var: `--cell-size: 36px` desktop, `25px` mobile. Changing this affects camera, grid, and sprite sizing.
+- Cell size CSS var: `--cell-size: 36px` everywhere. Changing this affects camera, grid, and sprite sizing.
 - `style.css` version query string in index.html must match to bust caches after CSS changes.
 - `game.js` version query string in index.html must match after JS changes.
 - High scores stored in `localStorage` under `laby.highScores.v1` — reset with hidden key `Z` during gameplay.
