@@ -356,9 +356,6 @@ body::before {
     content: '';
     position: absolute;
     pointer-events: none;
-}
-
-.cell[class*="cell-powerup-"]::after {
     inset: 0;
     background-image: var(--pu-sprite);
     background-repeat: no-repeat;
@@ -520,8 +517,7 @@ body.is-paused .modal-backdrop {
     }
 
     .enemy-hunter,
-    .cell[class*="cell-powerup-"]::after,
-    .pu-icon::after {
+    .cell[class*="cell-powerup-"]::after {
         filter: none;
     }
 

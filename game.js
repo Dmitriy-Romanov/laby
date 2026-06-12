@@ -740,13 +740,8 @@
     }
 
     function updateCamera(state, focusX = state.px, focusY = state.py) {
-        const cs = cellSize();
-        const area = gameAreaEl;
-        const availW = area.clientWidth - 4;
-        const availH = area.clientHeight - 4;
         const m = state.maze;
-        const viewW = Math.floor(availW / cs);
-        const viewH = Math.floor(availH / cs);
+        const {viewW, viewH} = getViewSize();
 
         if (m.w <= viewW) {
             state.camX = 0;
@@ -761,6 +756,14 @@
             const targetY = focusY - Math.floor(viewH * 0.5);
             state.camY = Math.max(0, Math.min(targetY, m.h - viewH));
         }
+    }
+
+    function getViewSize() {
+        const cs = cellSize();
+        return {
+            viewW: Math.floor((gameAreaEl.clientWidth - 4) / cs),
+            viewH: Math.floor((gameAreaEl.clientHeight - 4) / cs),
+        };
     }
 
     // ─── DOM Refs ──────────────────────────────────────────────────────────
@@ -975,10 +978,9 @@
         const mapH = Math.max(1, Math.round(m.h * scale));
         const ox = Math.floor((w - mapW) / 2);
         const oy = Math.floor((h - mapH) / 2);
-        const cs = cellSize();
-        const area = gameAreaEl;
-        const viewW = Math.min(m.w, Math.floor((area.clientWidth - 4) / cs));
-        const viewH = Math.min(m.h, Math.floor((area.clientHeight - 4) / cs));
+        const view = getViewSize();
+        const viewW = Math.min(m.w, view.viewW);
+        const viewH = Math.min(m.h, view.viewH);
         const viewX = ox + Math.round(state.camX * scale);
         const viewY = oy + Math.round(state.camY * scale);
         const viewRectW = Math.max(2, Math.round(viewW * scale));
@@ -1199,7 +1201,7 @@
 
     function recordRunScore(result) {
         if (!SCORE_LEVELS.includes(difficulty)) return;
-        const level = SCORE_LEVELS.includes(difficulty) ? difficulty : 'easy';
+        const level = difficulty;
         const entry = {
             name: '',
             score: state.score,
