@@ -9,6 +9,7 @@ Pure static web game (no backend, no build step). Open `index.html` in a browser
 | `index.html` | Single page: header with stats, game viewport, overlays, modals |
 | `game.js` | All logic in one IIFE: maze gen, game state, camera, rendering, input |
 | `style.css` | Full styling, ZX Spectrum palette, pixel font, animations |
+| `assets/sprites/*.svg` | Editable SVG sprites used directly by the game |
 
 ## Run
 
@@ -48,6 +49,7 @@ Then open `http://127.0.0.1:8765/`.
 - `renderMaze()`: computes cell state each frame, but writes `className` only when a cell actually changes
 - Enemies are created dynamically in `buildGrid()`, stored in `enemyEls[]`
 - Container/player/enemy transforms are cached to avoid duplicate style writes
+- Game objects use direct SVG sprites from `assets/sprites`; CSS should not add extra frames/insets around them
 - Fog of war: cells not recently revealed get `.cell-fog`. `FORGET_THRESHOLD = 7` moves
 - Normal sight reveals the 1-cell area around the player, plus straight corridor rays up to 3 cells in four cardinal directions. Corridor side walls are revealed; a wall directly ahead is revealed and stops that ray.
 
@@ -111,7 +113,7 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 ### Powerups (`placePowerups`, `collectPowerup`)
 
 - `PU_DENSITY = 100` — 1 powerup per 100 total cells
-- Key Scan powerups are placed first, at least 2 per key when space allows
+- Key Locate powerups are placed first, at least 2 per key when space allows
 - Torch powerups are placed separately: `2 * keys`, kept away from map edges when space allows
 - Life powerups are placed separately: `1 * keys`; they restore 1 life up to 5, or give +40 score at full lives
 - Other types cycle: `vision → freeze → xray → bonus → penalty → away` (`away` is shown to players as Repel)
@@ -119,13 +121,13 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
 - Effects:
   - `vision` — circular radius 4 around player, lasts 15 moves
   - `freeze` — stops all enemies, lasts 12 moves
-  - `xray` — instant 9x9 reveal around player, cells fade by normal fog rules
+  - `xray` — instant 13x13 reveal around player, cells fade by normal fog rules
   - `bonus` — instant +100 score, no duration
   - `penalty` — instant -50 score, clamped at 0
   - `life` — instant +1 life, or +40 score when already at 5 lives
   - `away` / **Repel** — enemies flee from player, lasts 5 enemy ticks
   - `torch` — permanently reveals a circular radius-4 area around the pickup cell
-  - `keyscan` — permanently reveals one random hidden key; if all keys are already revealed, gives +20 score
+  - `keyscan` — shown as Key Locate; permanently reveals one random hidden key; if all keys are already revealed, gives +20 score
 
 ### Scoring
 
@@ -146,7 +148,7 @@ flowchart TD
     Pickup -->|Bonus| Bonus["+100 score"]
     Pickup -->|Penalty| Penalty["-50 score, min 0"]
     Pickup -->|Life at max lives| LifeBonus["+40 score"]
-    Pickup -->|Key Scan with no hidden key| ScanBonus["+20 score"]
+    Pickup -->|Key Locate with no hidden key| ScanBonus["+20 score"]
     Pickup -->|Other / none| ExitCheck["Check exit and keys"]
     Bonus --> ExitCheck
     Penalty --> ExitCheck
@@ -178,7 +180,7 @@ flowchart TD
 - **Space**: opens/closes local high scores
 - Keyboard controls use physical key codes, so `WASD/C/N/H/Z` work in non-English layouts
 - Hidden service `Z`: resets local high scores. Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
-- Win/death results show the seed. Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit without enemies; keys stay visible during the replay, and the win modal returns after the replay so it can be shown again.
+- Win/death results show the seed. Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit; enemies are hidden during replay, keys stay visible, and the win modal returns after the replay so it can be shown again.
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
 - **Collect popup**: floating powerup name for 2 seconds, centered on screen
@@ -210,7 +212,7 @@ flowchart TD
 flowchart TD
     MazeSize["Maze cells = width * height"] --> Keys["Keys = floor(cells / 800), min 1"]
     MazeSize --> Powerups["Powerups = floor(cells / 100)"]
-    Keys --> KeyScan["Key Scan count = min(2 * keys, total powerups)"]
+    Keys --> KeyScan["Key Locate count = min(2 * keys, total powerups)"]
     Keys --> Torch["Torch target = 2 * keys"]
     Powerups --> KeyScan
     Powerups --> Torch
@@ -227,15 +229,27 @@ flowchart TD
 - **Palette**: ZX Spectrum
   - Background: `#000000` (black)
   - Walls: `#0000cd` (blue) / `#0000ff` border
-  - Player: `#ffff00` (yellow) glow
-  - Patrols: `#ff0000` (red) 3x3 blocks with eyes
-  - Hunters: cyan/magenta 2x2 scanner drones
+  - Player: editable 1x1 SVG sprite, currently blue body, red boots, yellow helmet, cyan visor
+  - Patrols: editable 3x3 SVG enemies
+  - Hunters: editable 2x2 SVG enemies
   - HUD: compact two-row arcade panel, score/moves text plus segmented Lives/Keys/Powerups bars
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
   - Exit: locked grate before keys, open green pixel door after keys
-  - Powerups: high-contrast cyan/silver/magenta/gold/red/orange/green/amber pixel module icons with stronger border and glow
+  - Powerups: editable 36x36 SVG icons rendered directly in the cell
+  - Keys and lit torches: separate editable map-object SVG sprites
 - Cell size: `--cell-size: 36px` desktop, `25px` mobile
+
+### Editable sprites
+
+All active sprite sources live in `assets/sprites/`.
+
+- Player: `player-hero-1x1.svg`
+- Enemies: `enemy-patrol-3x3.svg`, `enemy-hunter-2x2.svg`
+- Map objects: `key-framed-cell.svg`, `torch-lit-cell.svg`
+- Powerups: `powerup-*.svg`
+
+The game renders these files directly at their tile size: 36x36 for 1-cell objects, 72x72 for 2x2 enemies, and 108x108 for 3x3 enemies. Edit a file, reload the browser, and the game should show the changed sprite.
 
 ## Performance notes
 
@@ -253,7 +267,7 @@ PU_DENSITY = 100       — powerups per total cells
 EXTRA_PATH_DENSITY = 32 — lower value opens more wall links after maze generation
 KEY_DENSITY = 800      — keys per total cells
 PENALTY_POINTS = 50    — negative pickup score loss
-KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Scan has no hidden key left to reveal
+KEY_SCAN_BONUS_POINTS = 20 — score gain when Key Locate has no hidden key left to reveal
 LIFE_BONUS_POINTS = 40 — score gain when a life pickup is collected at max lives
 FINAL_LIVES_BONUS = 4000, FINAL_DOTS_BONUS = 4000, FINAL_POWERUPS_BONUS = 2000
 HUNTER_DENSITY = 800   — hunters per total cells

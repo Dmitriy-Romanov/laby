@@ -1,9 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" shape-rendering="crispEdges">
-  <title>Powerup: Penalty - minus</title>
-  <rect width="36" height="36" fill="none"/>
-  <rect x="4" y="4" width="28" height="28" fill="#aa0000"/>
-  <rect x="7" y="7" width="22" height="22" fill="#ff0000"/>
-  <rect x="10" y="16" width="17" height="5" fill="#ffffff"/>
-  <rect x="8" y="8" width="20" height="2" fill="#ffaaaa"/>
-  <rect x="8" y="27" width="20" height="2" fill="#660000"/>
-</svg>
+<svg shape-rendering="crispEdges" height="36" width="36" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23.04 23.04" xml:space="preserve"><path style="fill:#ff0000" d="M23.04 11.52c0 6.363-5.157 11.52-11.52 11.52S0 17.883 0 11.52 5.157 0 11.52 0s11.52 5.158 11.52 11.52"/><path style="fill:#cc0000" d="m23.037 11.636-.022-.022-5.764-5.764a8.04 8.04 0 0 0-5.731-2.398c-4.448 0-8.068 3.619-8.068 8.068a8.04 8.04 0 0 0 2.398 5.731l.062.062 5.703 5.703.022.022c6.27-.062 11.339-5.131 11.401-11.401"/><path style="fill:#ffffff" d="M11.52 3.452c-4.448 0-8.068 3.619-8.068 8.068s3.62 8.068 8.068 8.068 8.068-3.62 8.068-8.068-3.62-8.068-8.068-8.068m0 15.463c-4.078 0-7.395-3.318-7.395-7.395s3.317-7.395 7.395-7.395 7.395 3.317 7.395 7.395-3.317 7.395-7.395 7.395"/><path style="fill:#ffffff" d="M15.554 11.184H7.486a.336.336 0 0 0-.336.336.336.336 0 0 0 .336.336h8.068a.336.336 0 0 0 .336-.336.335.335 0 0 0-.336-.336"/></svg>

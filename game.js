@@ -666,7 +666,7 @@
                         return 'life-bonus';
                     }
                 } else if (type === 'xray') {
-                    revealArea(state, state.px, state.py, 4);
+                    revealArea(state, state.px, state.py, 6);
                 } else if (type === 'keyscan') {
                     const result = applyKeyScan(state);
                     state.powerups.splice(i, 1);
@@ -1256,7 +1256,7 @@
         }
     }
 
-    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', life: 'LIFE', 'life-bonus': '+40 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY SCAN', 'keyscan-bonus': '+20 PTS'};
+    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', life: 'LIFE', 'life-bonus': '+40 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY LOCATE', 'keyscan-bonus': '+20 PTS'};
     let collectTimeout = null;
 
     function showCollectPopup(type) {
@@ -1287,6 +1287,8 @@
         const now = Date.now();
         for (let i = 0; i < state.enemies.length; i++) {
             if (enemyEls[i]) {
+                enemyEls[i].classList.toggle('hidden', !!state.showingShortTrack);
+                if (state.showingShortTrack) continue;
                 const enemy = state.enemies[i];
                 const inactive = enemy.inactiveUntil > now;
                 enemyEls[i].classList.toggle('is-inactive', inactive);
@@ -1849,8 +1851,6 @@
     $('#btn-new-after-death').addEventListener('click', showDifficulty);
     $('#btn-new-after-scores').addEventListener('click', showDifficulty);
     $('#btn-scores-close').addEventListener('click', closeScores);
-    const resetScoresButton = $('#btn-reset-scores');
-    if (resetScoresButton) resetScoresButton.addEventListener('click', resetScoreTables);
     $('#btn-cancel').addEventListener('click', closeSettings);
     $('#btn-help-close').addEventListener('click', toggleHelp);
     helpModal.querySelector('.modal-backdrop').addEventListener('click', toggleHelp);

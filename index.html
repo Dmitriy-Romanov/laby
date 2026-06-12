@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LABY — Maze Game</title>
-    <link rel="stylesheet" href="style.css?v=20260612-one-player">
+    <link rel="stylesheet" href="style.css?v=20260612-key-win-hud">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap" rel="stylesheet">
 </head>
@@ -42,7 +42,6 @@
         <div id="win-overlay" class="win-overlay hidden">
             <div class="win-card">
                 <div class="status-mark">WIN</div>
-                <h2>Exit located</h2>
                 <p>Your moves: <strong id="win-moves">0</strong></p>
                 <p>Short track: <strong id="win-short-moves">0</strong></p>
                 <p>Visited: <strong id="win-visited">0/0</strong> cells</p>
@@ -163,13 +162,13 @@
             <div class="help-powerups">
                 <div class="help-row"><span class="pu-icon pu-vision" aria-hidden="true"></span> <strong>Vision</strong> — visibility +15</div>
                 <div class="help-row"><span class="pu-icon pu-freeze" aria-hidden="true"></span> <strong>Freeze</strong> — stop enemies</div>
-                <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal 9x9</div>
+                <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal 13x13</div>
                 <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — +100 pts</div>
                 <div class="help-row"><span class="pu-icon pu-penalty" aria-hidden="true"></span> <strong>Penalty</strong> — -50 pts</div>
                 <div class="help-row"><span class="pu-icon pu-life" aria-hidden="true"></span> <strong>Life</strong> — +1 life or +40 pts</div>
                 <div class="help-row"><span class="pu-icon pu-away" aria-hidden="true"></span> <strong>Repel</strong> — enemy retreat</div>
                 <div class="help-row"><span class="pu-icon pu-torch" aria-hidden="true"></span> <strong>Torch</strong> — permanent light</div>
-                <div class="help-row"><span class="pu-icon pu-keyscan" aria-hidden="true"></span> <strong>Key Scan</strong> — reveal 1 key or +20 pts</div>
+                <div class="help-row"><span class="pu-icon pu-keyscan" aria-hidden="true"></span> <strong>Key Locate</strong> — reveal 1 key or +20 pts</div>
             </div>
         </div>
         <div class="help-section">
