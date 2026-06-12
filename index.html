@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LABY — Maze Game</title>
-    <link rel="stylesheet" href="style.css?v=20260612-hud-digits">
+    <link rel="stylesheet" href="style.css?v=20260612-mechanics-dpad">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap" rel="stylesheet">
 </head>
@@ -12,16 +12,13 @@
 <div class="app">
     <header class="header">
         <div class="hud-main" aria-label="Game status">
-            <div class="hud-row">
-                <div class="hud-counter hud-score"><span class="hud-symbol">$</span><span id="score"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
-                <div class="hud-icons hud-lives" id="lives-bar" aria-label="Lives"></div>
-                <div class="hud-icons hud-keys" id="keys-bar" aria-label="Keys"></div>
-            </div>
-            <div class="hud-row">
-                <div class="hud-counter hud-moves"><span class="hud-symbol">↦</span><span id="moves"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
-                <div class="hud-counter hud-powerups"><span class="hud-symbol">★</span><span id="powerups"><span class="stat-d">0</span><span class="stat-sep">/</span><span class="stat-d">0</span></span></div>
-                <div class="hud-counter hud-dots"><span class="hud-symbol">♦</span><span id="dots"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-sep">/</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
-            </div>
+            <div class="hud-counter hud-score"><span class="hud-symbol">$</span><span id="score"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
+            <div class="hud-counter hud-timer"><span class="hud-symbol">◷</span><span id="timer">0:00</span></div>
+            <div class="hud-icons hud-lives" id="lives-bar" aria-label="Lives"></div>
+            <div class="hud-icons hud-keys" id="keys-bar" aria-label="Keys"></div>
+            <div class="hud-counter hud-moves"><span class="hud-symbol">↦</span><span id="moves"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
+            <div class="hud-counter hud-powerups"><span class="hud-symbol">★</span><span id="powerups"><span class="stat-d">0</span><span class="stat-sep">/</span><span class="stat-d">0</span></span></div>
+            <div class="hud-counter hud-dots"><span class="hud-symbol">♦</span><span id="dots"><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-sep">/</span><span class="stat-d">0</span><span class="stat-d">0</span><span class="stat-d">0</span></span></div>
         </div>
         <button class="help-hint" type="button" aria-label="H Help">
             <span class="key-main">H</span>
@@ -38,6 +35,13 @@
             <div id="track-runner" class="track-runner hidden"></div>
         </div>
         <canvas id="minimap" class="minimap" width="160" height="96" aria-label="Map position"></canvas>
+
+        <div class="touch-pad" id="touch-pad">
+            <button class="dpad-btn dpad-up" data-dx="0" data-dy="-1" aria-label="Move up">▲</button>
+            <button class="dpad-btn dpad-left" data-dx="-1" data-dy="0" aria-label="Move left">◄</button>
+            <button class="dpad-btn dpad-right" data-dx="1" data-dy="0" aria-label="Move right">►</button>
+            <button class="dpad-btn dpad-down" data-dx="0" data-dy="1" aria-label="Move down">▼</button>
+        </div>
 
         <div id="win-overlay" class="win-overlay hidden">
             <div class="win-card">
@@ -163,9 +167,8 @@
                 <div class="help-row"><span class="pu-icon pu-vision" aria-hidden="true"></span> <strong>Vision</strong> — visibility +15</div>
                 <div class="help-row"><span class="pu-icon pu-freeze" aria-hidden="true"></span> <strong>Freeze</strong> — stop enemies</div>
                 <div class="help-row"><span class="pu-icon pu-xray" aria-hidden="true"></span> <strong>X-Ray</strong> — reveal 13x13</div>
-                <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — +100 pts</div>
-                <div class="help-row"><span class="pu-icon pu-penalty" aria-hidden="true"></span> <strong>Penalty</strong> — -50 pts</div>
-                <div class="help-row"><span class="pu-icon pu-life" aria-hidden="true"></span> <strong>Life</strong> — +1 life or +40 pts</div>
+                <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> <strong>Bonus</strong> — +10 pts</div>
+                <div class="help-row"><span class="pu-icon pu-life" aria-hidden="true"></span> <strong>Life</strong> — +1 life or +4 pts</div>
                 <div class="help-row"><span class="pu-icon pu-away" aria-hidden="true"></span> <strong>Repel</strong> — enemy retreat</div>
                 <div class="help-row"><span class="pu-icon pu-torch" aria-hidden="true"></span> <strong>Torch</strong> — permanent light</div>
                 <div class="help-row"><span class="pu-icon pu-keyscan" aria-hidden="true"></span> <strong>Key Locate</strong> — reveal 1 key or +20 pts</div>
@@ -173,10 +176,8 @@
         </div>
         <div class="help-section">
             <h3>Scoring</h3>
-            <div class="help-row"><span class="score-cell score-cell-new" aria-hidden="true"></span> +10 for each new cell visited</div>
-            <div class="help-row"><span class="score-cell score-cell-visited" aria-hidden="true"></span> -1 for stepping on a visited cell</div>
-            <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> +100 for a bonus pickup</div>
-            <div class="help-row"><span class="pu-icon pu-penalty" aria-hidden="true"></span> -50 for a penalty pickup, never below 0</div>
+            <div class="help-row"><span class="score-cell score-cell-new" aria-hidden="true"></span> +1 for each new cell visited</div>
+            <div class="help-row"><span class="pu-icon pu-bonus" aria-hidden="true"></span> +10 for a bonus pickup</div>
         </div>
         <div class="help-section">
             <h3>Goal</h3>
@@ -189,6 +190,6 @@
     </div>
 </div>
 
-<script src="game.js?v=20260612-hud-digits"></script>
+<script src="game.js?v=20260612-mechanics-dpad"></script>
 </body>
 </html>

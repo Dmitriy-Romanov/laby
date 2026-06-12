@@ -82,17 +82,23 @@ body::before {
 
 .hud-main {
     display: grid;
-    grid-template-rows: 1fr 1fr;
-    gap: 2px;
+    grid-template-columns: repeat(4, auto) 1fr;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+        "score timer lives keys ."
+        "moves powerups dots . .";
+    gap: 2px 8px;
+    align-items: center;
     min-width: 0;
 }
 
-.hud-row {
-    display: flex;
-    align-items: center;
-    gap: clamp(8px, 1.25vw, 20px);
-    min-width: 0;
-}
+.hud-score  { grid-area: score; }
+.hud-timer  { grid-area: timer; }
+.hud-lives  { grid-area: lives; }
+.hud-keys   { grid-area: keys; }
+.hud-moves  { grid-area: moves; }
+.hud-powerups { grid-area: powerups; }
+.hud-dots   { grid-area: dots; }
 
 .hud-counter {
     display: inline-flex;
@@ -106,6 +112,11 @@ body::before {
     line-height: 1;
     white-space: nowrap;
     text-transform: uppercase;
+}
+
+#timer {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
 }
 
 .stat-d {
@@ -399,11 +410,6 @@ body::before {
     --pu-sprite: url("assets/sprites/powerup-bonus-plus.svg");
 }
 
-.cell-powerup-penalty,
-.pu-penalty {
-    --pu-sprite: url("assets/sprites/powerup-penalty-minus.svg");
-}
-
 .cell-powerup-life,
 .pu-life {
     --pu-sprite: url("assets/sprites/powerup-life-heart.svg");
@@ -513,6 +519,68 @@ body.is-paused .win-overlay,
 body.is-paused .modal-backdrop {
     backdrop-filter: none;
 }
+
+.touch-pad {
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    left: 20px;
+    z-index: 50;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(3, 48px);
+    gap: 4px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.dpad-btn {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 205, 0.45);
+    border: 2px solid rgba(0, 205, 205, 0.6);
+    color: #00ffff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    border-radius: 0;
+}
+
+.dpad-btn:active {
+    background: rgba(0, 205, 205, 0.5);
+    border-color: #ffff00;
+    color: #ffff00;
+}
+
+.dpad-up    { grid-column: 2; grid-row: 1; }
+.dpad-left  { grid-column: 1; grid-row: 2; }
+.dpad-right { grid-column: 3; grid-row: 2; }
+.dpad-down  { grid-column: 2; grid-row: 3; }
+
+@media (hover: none), (pointer: coarse) {
+    .touch-pad {
+        display: grid;
+    }
+}
+
+.dpad-center {
+    background: rgba(0, 0, 0, 0.6);
+    border-color: #0000ff;
+    color: #cdcdcd;
+    font-size: 0.7rem;
+}
+
+.dpad-up    { grid-column: 2; grid-row: 1; }
+.dpad-left  { grid-column: 1; grid-row: 2; }
+.dpad-center{ grid-column: 2; grid-row: 2; }
+.dpad-right { grid-column: 3; grid-row: 2; }
+.dpad-down  { grid-column: 2; grid-row: 3; }
 
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
     .maze-container,
@@ -833,10 +901,6 @@ body.is-paused .modal-backdrop {
 @media (max-width: 1380px) {
     .header {
         gap: 10px;
-    }
-
-    .hud-row {
-        gap: 12px;
     }
 
 }
@@ -1266,32 +1330,32 @@ kbd {
     }
     body::before { border-width: 5px; }
     .header {
-        min-height: 72px;
-        height: 72px;
+        min-height: auto;
+        height: auto;
         grid-template-columns: minmax(0, 1fr) 54px;
         align-items: stretch;
         gap: 8px;
         padding: 5px 8px;
     }
     .hud-main {
-        gap: 3px;
+        grid-template-columns: repeat(3, auto) 1fr;
+        grid-template-rows: auto auto auto;
+        grid-template-areas:
+            "score timer . ."
+            "lives keys . ."
+            "moves powerups dots .";
+        gap: 1px 6px;
     }
-    .hud-row {
-        display: grid;
-        grid-template-columns: minmax(76px, 0.76fr) minmax(0, 1fr);
-        gap: 5px 7px;
-    }
-    .hud-row:first-child {
-        grid-template-columns: minmax(76px, 0.76fr) minmax(74px, 0.62fr) minmax(0, 1fr);
-    }
+    .hud-lives { transform: translate(3px, 3px); }
+    .hud-keys  { transform: translate(3px, 3px); }
     .hud-counter {
         min-width: 0;
-        font-size: 0.92rem;
+        font-size: 1.23rem;
         gap: 4px;
     }
     .hud-icons {
-        font-size: 0.9rem;
-        gap: 1px;
+        font-size: 1.23rem;
+        gap: 2px;
     }
     .help-hint {
         width: 54px;
@@ -1349,5 +1413,4 @@ kbd {
     .help-powerups .help-row {
         flex-wrap: wrap;
     }
-    :root { --cell-size: 25px; }
 }

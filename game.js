@@ -174,18 +174,18 @@
     }
 
     // ─── Game State ────────────────────────────────────────────────────────
-    const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'penalty', 'away'];
+    const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'away'];
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
-    const BONUS_POINTS = 100;
-    const KEY_SCAN_BONUS_POINTS = 20;
-    const LIFE_BONUS_POINTS = 40;
-    const PENALTY_POINTS = 50;
-    const CELL_POINTS = 10;
-    const REVISIT_PENALTY = 1;
+    const BONUS_POINTS = 10;
+    const KEY_SCAN_BONUS_POINTS = 2;
+    const LIFE_BONUS_POINTS = 4;
+    const CELL_POINTS = 1;
     const START_LIVES = 5;
-    const FINAL_LIVES_BONUS = 4000;
-    const FINAL_DOTS_BONUS = 4000;
-    const FINAL_POWERUPS_BONUS = 2000;
+    const FINAL_LIVES_BONUS = 400;
+    const FINAL_DOTS_BONUS = 400;
+    const FINAL_POWERUPS_BONUS = 200;
+    const TIME_BONUS = 200;
+    const TIME_PAR_SECONDS = 300;
     const HIT_RESPAWN_MS = 5000;
     const HIT_INVULNERABLE_MS = 900;
     const ENEMY_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
@@ -256,6 +256,8 @@
             totalGoodPowerups: 0,
             collectedGoodPowerups: 0,
             finalScoreApplied: false,
+            startTime: 0,
+            timerStarted: false,
             baseScore: 0,
             finalBonus: null,
             shortTrackRoute: null,
@@ -416,7 +418,7 @@
             state.powerups.push({x: c.x, y: c.y, type: ptype});
         }
         state.totalPowerups = state.powerups.length;
-        state.totalGoodPowerups = state.powerups.filter(p => p.type !== 'penalty').length;
+        state.totalGoodPowerups = state.totalPowerups;
     }
 
     function effectiveRadius(state) {
@@ -661,8 +663,6 @@
                 const type = p.type;
                 if (type === 'bonus') {
                     state.score += BONUS_POINTS;
-                } else if (type === 'penalty') {
-                    state.score = Math.max(0, state.score - PENALTY_POINTS);
                 } else if (type === 'life') {
                     if (state.lives < START_LIVES) state.lives++;
                     else {
@@ -688,7 +688,7 @@
                 }
                 state.powerups.splice(i, 1);
                 state.collectedPowerups++;
-                if (type !== 'penalty') state.collectedGoodPowerups++;
+                state.collectedGoodPowerups++;
                 return type;
             }
         }
@@ -731,8 +731,6 @@
         if (!state.visited.has(key)) {
             state.visited.add(key);
             state.score += CELL_POINTS;
-        } else {
-            state.score = Math.max(0, state.score - REVISIT_PENALTY);
         }
     }
 
@@ -783,6 +781,7 @@
     const trackRunnerEl = $('#track-runner');
     const minimapEl = $('#minimap');
     const movesEl = $('#moves');
+    const timerEl = $('#timer');
     const scoreEl = $('#score');
     const powerupsEl = $('#powerups');
     const dotsEl = $('#dots');
@@ -813,8 +812,11 @@
 
     let moving = false;
     let tickInterval = null;
+    let timerInterval = null;
     let state = null;
     let paused = false;
+    let pauseStart = 0;
+    let pausedDuration = 0;
     let enemyEls = [];
     let scoreTables = loadScoreTables();
     let activeScoreTab = 'easy';
@@ -822,18 +824,29 @@
     let shortTrackTimer = null;
 
     function setPaused(value) {
+        if (value === paused) return;
         paused = value;
+        if (paused) {
+            pauseStart = Date.now();
+            stopTick();
+            stopTimer();
+        } else {
+            if (pauseStart) pausedDuration += Date.now() - pauseStart;
+            pauseStart = 0;
+            if (state && !state.dead && !state.won) { startTick(); startTimer(); }
+        }
         appEl.classList.toggle('is-paused', paused);
         document.body.classList.toggle('is-paused', paused);
-        if (paused) {
-            stopTick();
-        } else if (state && !state.dead && !state.won) {
-            startTick();
-        }
     }
 
     function cellSize() {
         return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
+    }
+
+    function gameElapsed() {
+        if (!state || !state.timerStarted) return 0;
+        const now = paused ? pauseStart : Date.now();
+        return now - state.startTime - pausedDuration;
     }
 
     function padStat(value, size) {
@@ -1280,7 +1293,7 @@
         }
     }
 
-    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+100 PTS', penalty: '-50 PTS', life: 'LIFE', 'life-bonus': '+40 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY LOCATE', 'keyscan-bonus': '+20 PTS'};
+    const PU_NAMES = {vision: 'VISION', freeze: 'FREEZE', xray: 'X-RAY', bonus: '+10 PTS', life: 'LIFE', 'life-bonus': '+4 PTS', away: 'REPEL', torch: 'TORCH', keyscan: 'KEY LOCATE', 'keyscan-bonus': '+2 PTS'};
     let collectTimeout = null;
 
     function showCollectPopup(type) {
@@ -1385,7 +1398,7 @@
         updateCamera(state);
         applyPositions();
 
-        scoreEl.innerHTML = statDigits(state.score, 5);
+        scoreEl.innerHTML = statDigits(state.score, 4);
         movesEl.innerHTML = statDigits(state.moveCount, 4);
         powerupsEl.innerHTML = statRatio(state.collectedPowerups, 2, state.totalPowerups, 2);
         dotsEl.innerHTML = statRatio(state.visited.size, 3, countWalkableCells(), 3);
@@ -1509,12 +1522,17 @@
         const dotsBonus = walkable > 0 ? Math.round(FINAL_DOTS_BONUS * (state.visited.size / walkable)) : 0;
         const powerupsBonus = state.totalGoodPowerups > 0 ?
             Math.round(FINAL_POWERUPS_BONUS * (state.collectedGoodPowerups / state.totalGoodPowerups)) : 0;
+        const elapsedSec = gameElapsed() / 1000;
+        const timeRatio = Math.max(0, 1 - elapsedSec / TIME_PAR_SECONDS);
+        const timeBonus = Math.round(TIME_BONUS * timeRatio);
         return {
             livesBonus,
             dotsBonus,
             powerupsBonus,
-            total: livesBonus + dotsBonus + powerupsBonus,
+            timeBonus,
+            total: livesBonus + dotsBonus + powerupsBonus + timeBonus,
             walkable,
+            elapsedSec,
         };
     }
 
@@ -1529,12 +1547,16 @@
     function renderFinalBreakdown(el) {
         if (!el || !state.finalBonus) return;
         const b = state.finalBonus;
+        const mins = Math.floor(b.elapsedSec / 60);
+        const secs = Math.floor(b.elapsedSec % 60);
+        const timeStr = mins + ':' + String(secs).padStart(2, '0');
         el.innerHTML = [
             'Game Score: ' + state.baseScore,
             'Bonuses:',
             'Lives: +' + b.livesBonus + ' (' + state.lives + '/' + START_LIVES + ')',
             'Dots: +' + b.dotsBonus + ' (' + state.visited.size + '/' + b.walkable + ')',
             'Powerups: +' + b.powerupsBonus + ' (' + state.collectedGoodPowerups + '/' + state.totalGoodPowerups + ')',
+            'Time: +' + b.timeBonus + ' (' + timeStr + ')',
             'Total Score = ' + state.score,
         ].map(line => '<div>' + line + '</div>').join('');
     }
@@ -1703,15 +1725,33 @@
         if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
     }
 
+    function startTimer() {
+        stopTimer();
+        timerInterval = setInterval(() => {
+            if (!state || paused || state.dead || state.won) return;
+            const elapsed = Math.floor(gameElapsed() / 1000);
+            const tMins = Math.floor(elapsed / 60);
+            const tSecs = elapsed % 60;
+            setText(timerEl, tMins + ':' + String(tSecs).padStart(2, '0'));
+        }, 500);
+    }
+
+    function stopTimer() {
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
     function newGame(width, height, seed = makeSeed()) {
         initAudio();
         stopShortTrack();
+        pausedDuration = 0;
+        pauseStart = 0;
         setPaused(false);
         currentSeed = seed.trim ? seed.trim().toUpperCase() : String(seed).toUpperCase();
         if (!currentSeed) currentSeed = makeSeed();
         rng = createRng(currentSeed);
         state = createGame(width, height);
         inputSeed.value = currentSeed;
+        stopTimer();
         buildGrid();
         renderMaze();
         startTick();
@@ -1720,6 +1760,11 @@
     function move(dx, dy) {
         if (!state || moving || paused || state.dead || state.won) return;
         initAudio();
+        if (!state.timerStarted) {
+            state.timerStarted = true;
+            state.startTime = Date.now();
+            startTimer();
+        }
         moving = true;
 
         tickEffects(state);
@@ -1918,5 +1963,44 @@
             activeScoreTab = btn.dataset.scoreTab;
             renderScoreTable();
         });
+    });
+
+    // ─── Touch D-pad ───────────────────────────────────────────────────
+    let dpadRepeatTimer = null;
+    let dpadRepeatDelay = null;
+
+    function dpadMove(dx, dy) {
+        move(dx, dy);
+    }
+
+    function dpadStartRepeat(dx, dy) {
+        dpadStopRepeat();
+        dpadRepeatDelay = setTimeout(() => {
+            dpadRepeatTimer = setInterval(() => dpadMove(dx, dy), 180);
+        }, 300);
+    }
+
+    function dpadStopRepeat() {
+        if (dpadRepeatDelay) { clearTimeout(dpadRepeatDelay); dpadRepeatDelay = null; }
+        if (dpadRepeatTimer) { clearInterval(dpadRepeatTimer); dpadRepeatTimer = null; }
+    }
+
+    document.querySelectorAll('.dpad-btn[data-dx]').forEach(btn => {
+        const dx = parseInt(btn.dataset.dx, 10);
+        const dy = parseInt(btn.dataset.dy, 10);
+
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            initAudio();
+            dpadMove(dx, dy);
+            dpadStartRepeat(dx, dy);
+        }, {passive: false});
+
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            dpadStopRepeat();
+        }, {passive: false});
+
+        btn.addEventListener('touchcancel', () => dpadStopRepeat());
     });
 })();
