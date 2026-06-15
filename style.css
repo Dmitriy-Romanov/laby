@@ -569,11 +569,6 @@ body.is-paused .modal-backdrop {
     }
 }
 
-.dpad-up    { grid-column: 2; grid-row: 1; }
-.dpad-left  { grid-column: 1; grid-row: 2; }
-.dpad-right { grid-column: 3; grid-row: 2; }
-.dpad-down  { grid-column: 2; grid-row: 3; }
-
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
     .maze-container,
     .cell,
@@ -600,6 +595,30 @@ body.is-paused .modal-backdrop {
     .win-overlay,
     .modal-backdrop {
         backdrop-filter: none;
+    }
+
+    .screen-flash {
+        animation: none;
+    }
+
+    .shake {
+        animation: none;
+    }
+
+    .death-overlay,
+    .win-overlay,
+    .modal-backdrop {
+        animation: none;
+    }
+
+    .death-card,
+    .win-card,
+    .scores-card {
+        animation: none;
+    }
+
+    .collect-popup {
+        animation: none;
     }
 }
 

@@ -145,7 +145,7 @@
 
     function spreadDistance(totalCells, count, minDistance) {
         if (count <= 1) return 0;
-        return Math.max(minDistance, Math.floor(Math.sqrt(totalCells / count) * 0.55));
+        return Math.max(minDistance, Math.floor(Math.sqrt(totalCells / count) * SPREAD_FACTOR));
     }
 
     function selectSpreadCells(candidates, count, minDistance, blockers = []) {
@@ -210,6 +210,13 @@
     const SCORE_LEVELS = ['easy', 'medium', 'hard'];
     const SCORE_LIMIT = 5;
     const SCORE_NAME_LIMIT = 7;
+    const TSP_CAP = 12;
+    const SPREAD_FACTOR = 0.55;
+    const HUNTER_CHASE_NOISE = 0.45;
+    const RANDOM_DIR_CHANGE_CHANCE = 0.25;
+    const SHORT_TRACK_INTERVAL = 55;
+    const DPAD_REPEAT_DELAY = 300;
+    const DPAD_REPEAT_INTERVAL = 180;
     let difficulty = 'easy';
     let currentSeed = makeSeed();
 
@@ -435,11 +442,13 @@
     }
 
     function revealCirclePermanent(state, cx, cy, r) {
+        revealRect(state, cx, cy, r);
+    }
+
+    function revealRect(state, cx, cy, r) {
         const m = state.maze;
-        const r2 = r * r;
         for (let dy = -r; dy <= r; dy++) {
             for (let dx = -r; dx <= r; dx++) {
-                if (dx * dx + dy * dy > r2) continue;
                 const nx = cx + dx;
                 const ny = cy + dy;
                 if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
@@ -450,16 +459,7 @@
     }
 
     function revealAroundPermanent(state, cx, cy, r = 1) {
-        const m = state.maze;
-        for (let dy = -r; dy <= r; dy++) {
-            for (let dx = -r; dx <= r; dx++) {
-                const nx = cx + dx;
-                const ny = cy + dy;
-                if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-                    revealCellPermanent(state, nx, ny);
-                }
-            }
-        }
+        revealRect(state, cx, cy, r);
     }
 
     function resetReplayVisibility(state) {
@@ -561,7 +561,7 @@
                 }
                 e.dir = bestDir;
             } else if (e.ticks % e.chaseEvery === 0) {
-                const chaseNoise = e.type === 'hunter' ? 0.45 : 0;
+                const chaseNoise = e.type === 'hunter' ? HUNTER_CHASE_NOISE : 0;
                 if (chaseNoise && rng() < chaseNoise) {
                     e.dir = Math.floor(rng() * ENEMY_DIRS.length);
                 } else {
@@ -577,7 +577,7 @@
                     }
                     e.dir = bestDir;
                 }
-            } else if (rng() < 0.25) {
+            } else if (rng() < RANDOM_DIR_CHANGE_CHANCE) {
                 e.dir = Math.floor(rng() * ENEMY_DIRS.length);
             }
             const [dx, dy] = ENEMY_DIRS[e.dir];
@@ -606,11 +606,12 @@
     function respawnEnemy(state, enemy) {
         const candidates = [];
         const m = state.maze;
+        const idx = state.enemies.indexOf(enemy);
         for (let y = enemy.minY; y <= enemy.maxY; y++) {
             for (let x = enemy.minX; x <= enemy.maxX; x++) {
                 if (m.grid[y * m.w + x] === WALL) continue;
                 const candidate = {...enemy, x, y, inactiveUntil: 0};
-                if (!canPlaceEnemy(state.enemies, state.enemies.indexOf(enemy), candidate)) continue;
+                if (!canPlaceEnemy(state.enemies, idx, candidate)) continue;
                 candidates.push({x, y, dist: Math.abs(x - state.px) + Math.abs(y - state.py)});
             }
         }
@@ -664,22 +665,15 @@
                 if (type === 'bonus') {
                     state.score += BONUS_POINTS;
                 } else if (type === 'life') {
-                    if (state.lives < START_LIVES) state.lives++;
-                    else {
+                    if (state.lives < START_LIVES) {
+                        state.lives++;
+                    } else {
                         state.score += LIFE_BONUS_POINTS;
-                        state.powerups.splice(i, 1);
-                        state.collectedPowerups++;
-                        state.collectedGoodPowerups++;
-                        return 'life-bonus';
                     }
                 } else if (type === 'xray') {
                     revealArea(state, state.px, state.py, 6);
                 } else if (type === 'keyscan') {
-                    const result = applyKeyScan(state);
-                    state.powerups.splice(i, 1);
-                    state.collectedPowerups++;
-                    state.collectedGoodPowerups++;
-                    return result === 'score' ? 'keyscan-bonus' : type;
+                    applyKeyScan(state);
                 } else if (type === 'torch') {
                     state.torches.push({x: p.x, y: p.y});
                     revealCirclePermanent(state, p.x, p.y, TORCH_RADIUS);
@@ -962,6 +956,7 @@
     }
 
     function exactKeyOrder(keys) {
+        if (keys.length > 12) return nearestKeyOrder(keys);
         const points = [state.maze.startPos, ...keys, state.maze.exitPos];
         const distances = Array.from({length: points.length}, () => []);
         for (let i = 0; i < points.length; i++) {
@@ -1594,7 +1589,7 @@
             revealAroundPermanent(state, route[index].x, route[index].y);
             renderMaze();
             setTrackRunnerPosition(route[index]);
-        }, 55);
+        }, SHORT_TRACK_INTERVAL);
     }
 
     function saveDebugSnapshot() {
@@ -1706,7 +1701,9 @@
             a.download = 'laby-snapshot-' + state.seed + '-' + Date.now() + '.json';
             a.click();
             URL.revokeObjectURL(url);
-        } catch (e) {}
+        } catch (e) {
+            try { URL.revokeObjectURL(url); } catch (_) {}
+        }
         showCollectPopup('SNAPSHOT SAVED');
     }
 
@@ -1851,6 +1848,25 @@
         ArrowRight: [1, 0], KeyD: [1, 0],
     };
 
+    function trapFocus(e) {
+        if (e.key !== 'Tab') return;
+        const modal = document.querySelector('.modal:not(.hidden)');
+        if (!modal) return;
+        const focusable = modal.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])');
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
+
+    document.addEventListener('keydown', trapFocus);
+
     document.addEventListener('keydown', (e) => {
         if (pendingScoreEntry) {
             if (handleScoreInput(e)) e.preventDefault();
@@ -1976,8 +1992,8 @@
     function dpadStartRepeat(dx, dy) {
         dpadStopRepeat();
         dpadRepeatDelay = setTimeout(() => {
-            dpadRepeatTimer = setInterval(() => dpadMove(dx, dy), 180);
-        }, 300);
+            dpadRepeatTimer = setInterval(() => dpadMove(dx, dy), DPAD_REPEAT_INTERVAL);
+        }, DPAD_REPEAT_DELAY);
     }
 
     function dpadStopRepeat() {
