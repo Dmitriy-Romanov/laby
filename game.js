@@ -669,11 +669,13 @@
                         state.lives++;
                     } else {
                         state.score += LIFE_BONUS_POINTS;
+                        type = 'life-bonus';
                     }
                 } else if (type === 'xray') {
                     revealArea(state, state.px, state.py, 6);
                 } else if (type === 'keyscan') {
-                    applyKeyScan(state);
+                    const ks = applyKeyScan(state);
+                    if (ks === 'score') type = 'keyscan-bonus';
                 } else if (type === 'torch') {
                     state.torches.push({x: p.x, y: p.y});
                     revealCirclePermanent(state, p.x, p.y, TORCH_RADIUS);
@@ -682,7 +684,9 @@
                 }
                 state.powerups.splice(i, 1);
                 state.collectedPowerups++;
-                state.collectedGoodPowerups++;
+                if (type !== 'life-bonus' && type !== 'keyscan-bonus') {
+                    state.collectedGoodPowerups++;
+                }
                 return type;
             }
         }
