@@ -324,7 +324,11 @@ The helper does not merge branches. Experimental work should stay isolated until
 
 ## GitHub
 
-This project is a pure static app and is safe to keep in a private GitHub repository. If publishing later, GitHub Pages can serve it directly from the repo root or a `docs/` folder.
+This project is published through GitHub Pages from `main` / repository root:
+
+https://dmitriy-romanov.github.io/laby/
+
+Any tested change pushed to `main` is deployed automatically. Keep experiments on separate branches until they are ready for the public site.
 
 See `HOSTING.md` for current practical hosting options and a recommended path.
 

@@ -58,10 +58,9 @@ Powerups:
 - `powerup-freeze-snowflake.svg` — Freeze
 - `powerup-xray-grid.svg` — X-Ray
 - `powerup-bonus-plus.svg` — Bonus
-- `powerup-penalty-minus.svg` — Penalty
 - `powerup-life-heart.svg` — Life
 - `powerup-repel-bars.svg` — Repel / Away
-- `powerup-keyscan-crosshair.svg` — Key Scan
+- `powerup-keyscan-crosshair.svg` — Key Locate
 - `powerup-torch-flame.svg` — Torch
 
 Keep `shape-rendering="crispEdges"` for ZX-style hard pixel edges.
