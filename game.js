@@ -217,8 +217,37 @@
     const SHORT_TRACK_INTERVAL = 55;
     const DPAD_REPEAT_DELAY = 300;
     const DPAD_REPEAT_INTERVAL = 180;
+    const PERF_METRICS = ['renderMaze', 'computeVisible', 'tickEnemies', 'buildShortTrackRoute'];
     let difficulty = 'easy';
     let currentSeed = makeSeed();
+    let perfOverlay = null;
+    const perfState = {
+        enabled: false,
+        metrics: Object.create(null),
+        renderQueued: false,
+    };
+
+    function perfStart(name) {
+        if (!perfState.enabled || !window.performance) return null;
+        return {name, start: performance.now()};
+    }
+
+    function perfEnd(sample) {
+        if (!sample) return;
+        const duration = performance.now() - sample.start;
+        const metric = perfState.metrics[sample.name] || {last: 0, avg: 0, max: 0, count: 0};
+        metric.last = duration;
+        metric.count++;
+        metric.avg += (duration - metric.avg) / metric.count;
+        metric.max = Math.max(metric.max, duration);
+        perfState.metrics[sample.name] = metric;
+        schedulePerfOverlayRender();
+    }
+
+    function resetPerfMetrics() {
+        perfState.metrics = Object.create(null);
+        schedulePerfOverlayRender();
+    }
 
     function createGame(width = 71, height = 41) {
         const maze = generateMaze(width, height);
@@ -527,20 +556,27 @@
     }
 
     function computeVisible(state) {
+        const perf = perfStart('computeVisible');
         const m = state.maze;
         const rev = state.revealed;
         const visible = state.visible;
-        for (let y = 0; y < m.h; y++) {
-            for (let x = 0; x < m.w; x++) {
-                visible[y][x] = rev[y][x] === PERMA_VISIBLE ||
-                    (rev[y][x] >= 0 && (state.moveCount - rev[y][x]) <= FORGET_THRESHOLD);
-                if (x === m.exitPos.x && y === m.exitPos.y) visible[y][x] = true;
+        try {
+            for (let y = 0; y < m.h; y++) {
+                for (let x = 0; x < m.w; x++) {
+                    visible[y][x] = rev[y][x] === PERMA_VISIBLE ||
+                        (rev[y][x] >= 0 && (state.moveCount - rev[y][x]) <= FORGET_THRESHOLD);
+                    if (x === m.exitPos.x && y === m.exitPos.y) visible[y][x] = true;
+                }
             }
+            return visible;
+        } finally {
+            perfEnd(perf);
         }
-        return visible;
     }
 
     function tickEnemies(state) {
+        const perf = perfStart('tickEnemies');
+        try {
         if (state.won || state.dead || state.effects.freeze) return;
         const fleeing = !!state.effects.away;
         const now = Date.now();
@@ -601,6 +637,9 @@
             }
         }
         checkEnemyCollisions(state);
+        } finally {
+            perfEnd(perf);
+        }
     }
 
     function respawnEnemy(state, enemy) {
@@ -661,7 +700,7 @@
         for (let i = 0; i < state.powerups.length; i++) {
             const p = state.powerups[i];
             if (p.x === state.px && p.y === state.py) {
-                const type = p.type;
+                let type = p.type;
                 if (type === 'bonus') {
                     state.score += BONUS_POINTS;
                 } else if (type === 'life') {
@@ -820,6 +859,50 @@
     let activeScoreTab = 'easy';
     let pendingScoreEntry = null;
     let shortTrackTimer = null;
+
+    function initPerfOverlay() {
+        perfOverlay = document.createElement('div');
+        perfOverlay.className = 'perf-overlay hidden';
+        perfOverlay.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(perfOverlay);
+    }
+
+    function renderPerfOverlay() {
+        if (!perfOverlay || !perfState.enabled) return;
+        const lines = ['PERF'];
+        for (const name of PERF_METRICS) {
+            const m = perfState.metrics[name];
+            if (!m) {
+                lines.push(name + ': --');
+                continue;
+            }
+            lines.push(
+                name + ': ' +
+                m.last.toFixed(2) + 'ms last / ' +
+                m.avg.toFixed(2) + 'ms avg / ' +
+                m.max.toFixed(2) + 'ms max'
+            );
+        }
+        perfOverlay.textContent = lines.join('\n');
+    }
+
+    function schedulePerfOverlayRender() {
+        if (!perfState.enabled || perfState.renderQueued) return;
+        perfState.renderQueued = true;
+        requestAnimationFrame(() => {
+            perfState.renderQueued = false;
+            renderPerfOverlay();
+        });
+    }
+
+    function togglePerfOverlay() {
+        perfState.enabled = !perfState.enabled;
+        if (perfOverlay) perfOverlay.classList.toggle('hidden', !perfState.enabled);
+        if (perfState.enabled) {
+            resetPerfMetrics();
+            schedulePerfOverlayRender();
+        }
+    }
 
     function setPaused(value) {
         if (value === paused) return;
@@ -991,11 +1074,16 @@
     }
 
     function buildShortTrackRoute() {
+        const perf = perfStart('buildShortTrackRoute');
+        try {
         if (state.shortTrackRoute) return state.shortTrackRoute;
         const keys = state.keys.map(k => ({x: k.x, y: k.y}));
         const orderedKeys = keys.length <= 10 ? exactKeyOrder(keys) : nearestKeyOrder(keys); // exactKeyOrder: O(2^N * N) memo — safe up to 10 keys
         state.shortTrackRoute = concatRouteSegments([state.maze.startPos, ...orderedKeys, state.maze.exitPos]);
         return state.shortTrackRoute;
+        } finally {
+            perfEnd(perf);
+        }
     }
 
     function drawMinimap() {
@@ -1041,6 +1129,13 @@
         ctx.fillRect(startX - 1, startY - 1, 3, 3);
         ctx.strokeStyle = '#ffffff';
         ctx.strokeRect(exitX - 2.5, exitY - 2.5, 5, 5);
+        ctx.fillStyle = '#ffff00';
+        for (const key of state.keys) {
+            if (key.collected || state.revealed[key.y][key.x] !== PERMA_VISIBLE) continue;
+            const keyX = ox + Math.round((key.x + 0.5) * scale);
+            const keyY = oy + Math.round((key.y + 0.5) * scale);
+            ctx.fillRect(keyX - 2, keyY - 2, 4, 4);
+        }
         ctx.fillStyle = '#ffff00';
         ctx.fillRect(playerX - 2, playerY - 2, 5, 5);
         ctx.strokeStyle = '#ff0000';
@@ -1338,6 +1433,8 @@
     }
 
     function renderMaze() {
+        const perf = perfStart('renderMaze');
+        try {
         const m = state.maze;
         if ((state.dead || state.won) && !state.finalScoreApplied) applyFinalScore();
         const visible = computeVisible(state);
@@ -1437,6 +1534,9 @@
             }
         } else {
             winOverlay.classList.add('hidden');
+        }
+        } finally {
+            perfEnd(perf);
         }
     }
 
@@ -1768,42 +1868,47 @@
         }
         moving = true;
 
-        tickEffects(state);
+        try {
+            tickEffects(state);
 
-        if (canMove(state, dx, dy)) {
-            state.px += dx;
-            state.py += dy;
-            state.moveCount++;
-            dropFootprint(state);
-            markVisited(state);
-            const keyCollected = collectKey(state);
-            if (keyCollected) {
-                showCollectPopup('KEY ACQUIRED');
-                sfxCollect();
-                if (state.collectedKeys === state.totalKeys) {
-                    showCollectPopup('ALL KEYS');
-                    sfxAllKeys();
+            if (canMove(state, dx, dy)) {
+                state.px += dx;
+                state.py += dy;
+                state.moveCount++;
+                dropFootprint(state);
+                markVisited(state);
+                const keyCollected = collectKey(state);
+                if (keyCollected) {
+                    showCollectPopup('KEY ACQUIRED');
+                    sfxCollect();
+                    if (state.collectedKeys === state.totalKeys) {
+                        showCollectPopup('ALL KEYS');
+                        sfxAllKeys();
+                    }
+                }
+                const pu = collectPowerup(state);
+                if (pu) {
+                    showCollectPopup(pu);
+                    if (pu === 'xray') flashScreen();
+                    sfxCollect();
+                } else if (!keyCollected) {
+                    sfxStep();
+                }
+                revealAround(state, state.px, state.py);
+                const m = state.maze;
+                if (state.py === m.exitPos.y && state.px === m.exitPos.x) {
+                    if (state.collectedKeys >= state.totalKeys) state.won = true;
+                    else showCollectPopup('KEYS REQUIRED');
                 }
             }
-            const pu = collectPowerup(state);
-            if (pu) {
-                showCollectPopup(pu);
-                if (pu === 'xray') flashScreen();
-                sfxCollect();
-            } else if (!keyCollected) {
-                sfxStep();
-            }
-            revealAround(state, state.px, state.py);
-            const m = state.maze;
-            if (state.py === m.exitPos.y && state.px === m.exitPos.x) {
-                if (state.collectedKeys >= state.totalKeys) state.won = true;
-                else showCollectPopup('KEYS REQUIRED');
-            }
-        }
 
-        checkEnemyCollisions(state);
-        renderMaze();
-        moving = false;
+            checkEnemyCollisions(state);
+            renderMaze();
+        } catch (error) {
+            console.error('Move failed', error);
+        } finally {
+            moving = false;
+        }
     }
 
     // ─── UI Events ────────────────────────────────────────────────────────
@@ -1887,6 +1992,11 @@
             resetScoreTables();
             return;
         }
+        if (e.code === 'KeyP') {
+            e.preventDefault();
+            togglePerfOverlay();
+            return;
+        }
         if (e.code === 'KeyX') {
             e.preventDefault();
             saveDebugSnapshot();
@@ -1935,6 +2045,8 @@
             move(...keyMap[e.code]);
         }
     });
+
+    initPerfOverlay();
 
     $('#btn-new-after-win').addEventListener('click', showDifficulty);
     $('#btn-show-short-track').addEventListener('click', showShortTrack);

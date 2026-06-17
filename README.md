@@ -171,13 +171,14 @@ flowchart TD
 - **Difficulty screen**: boot/title popup with `LABY`, `ZX-81 LAB UNIT`, and mode selection
 - **Custom** on the difficulty screen opens the Custom maze form before the first game
 - **HUD**: arcade panel with `$ score`, timer, step counter, heart lives, key icons, `★ powerups`, `♦ visited/total`, and H Help button. 2 rows on desktop, 3 rows on mobile.
+- **Minimap**: shows the current viewport, player, start, exit, and Key Locate-revealed uncollected keys
 - **C**: opens custom maze modal after a game is already running
 - **N**: opens difficulty modal for a new game
 - **WASD / Arrows**: move
 - **H**: opens help
 - **Space**: opens/closes local high scores
 - Keyboard controls use physical key codes, so `WASD/C/N/H/Z` work in non-English layouts
-- Hidden service `Z`: resets local high scores. Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
+- Hidden service `Z`: resets local high scores. Hidden debug `X`: saves a map snapshot JSON to `localStorage` and tries to download it. Hidden debug `P`: toggles the performance overlay for render/tick timings. Snapshot includes constants, viewport, camera, player, maze grid, visibility arrays, permanent/recent/stale visibility summaries, keys, replay keys, powerups, torches, enemies, effects, flags, and stats.
 - Win/death results show the seed. Win results compare player moves, short-track moves, and visited walkable cells. `Show short track` replays the computed route from start through all keys to the exit; enemies are hidden during replay, keys stay visible, and the win modal returns after the replay so it can be shown again.
 - Help/settings/win/death pause also disables active game animations to reduce browser/GPU load
 - Touch/reduced-motion environments disable decorative infinite animations and blur filters by default
@@ -254,6 +255,7 @@ The game renders these files directly at their tile size: 36x36 for 1-cell objec
 - `renderMaze()` avoids duplicate `className` writes through `state.cellClasses`
 - `visible[][]` is reused instead of allocated on every render
 - Camera/player/enemy transforms are cached before style writes
+- Hidden `P` overlay measures `renderMaze`, `computeVisible`, `tickEnemies`, and `buildShortTrackRoute` when enabled
 - Paused states add `.is-paused` to both `.app` and `body`
 - Touch/reduced-motion environments disable decorative infinite animations, blur filters, and expensive sprite filters
 - Browser checks showed the paused game dropping from high GPU use to normal idle-like consumption on desktop Chrome
@@ -271,6 +273,13 @@ KEY_SCAN_BONUS_POINTS = 2 — score when Key Locate has no hidden key
 FINAL_LIVES_BONUS = 400, FINAL_DOTS_BONUS = 400, FINAL_POWERUPS_BONUS = 200, TIME_BONUS = 200
 TIME_PAR_SECONDS = 300  — par time for full time bonus (5 minutes)
 HUNTER_DENSITY = 800   — hunters per total cells
+TSP_CAP = 12           — exactKeyOrder falls back to nearest-neighbor above this
+SPREAD_FACTOR = 0.55   — spread distance multiplier for powerup/key placement
+HUNTER_CHASE_NOISE = 0.45 — random direction chance on hunter chase ticks
+RANDOM_DIR_CHANGE_CHANCE = 0.25 — random direction change per tick
+SHORT_TRACK_INTERVAL = 55 — short track replay interval (ms)
+DPAD_REPEAT_DELAY = 300 — dpad hold delay before repeat (ms)
+DPAD_REPEAT_INTERVAL = 180 — dpad repeat interval (ms)
 Difficulty: beginner (51x31, no enemies), easy (71x41, patrol 800/10, hunter 800/8), medium (81x51, patrol 700/9, hunter 800/7), hard (91x61, patrol 600/8, hunter 800/6), custom (7..151 odd per side, easy enemy rules, no records)
 FORGET_THRESHOLD = 7   — fog returns after N moves
 Cell: 36px everywhere

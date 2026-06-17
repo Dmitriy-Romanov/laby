@@ -54,6 +54,26 @@ body::before {
     z-index: 300;
 }
 
+.perf-overlay {
+    position: fixed;
+    left: 18px;
+    bottom: 18px;
+    z-index: 310;
+    max-width: min(560px, calc(100vw - 36px));
+    padding: 10px 12px;
+    border: 2px solid #ffff00;
+    background: rgba(0, 0, 0, 0.78);
+    color: #ffff00;
+    font: 14px/1.35 monospace;
+    white-space: pre;
+    pointer-events: none;
+    box-shadow: 0 0 0 2px #0000cd, 0 0 18px rgba(255, 255, 0, 0.35);
+}
+
+.perf-overlay.hidden {
+    display: none;
+}
+
 .app {
     display: flex;
     flex-direction: column;
