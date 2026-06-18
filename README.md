@@ -130,6 +130,18 @@ Chase: every N-th tick, enemy picks direction closest to player (including diago
   - `torch` — permanently reveals a circular radius-4 area around the pickup cell
   - `keyscan` — shown as Key Locate; permanently reveals one random hidden key; if all keys are already revealed, gives +2 score
 
+### Shelters (`placeShelters`)
+
+- Safe cells the player can stand on; enemies cannot enter them
+- Count mirrors the number of keys (`state.totalKeys`)
+- Placed last in `createGame`, so keys/powerups/enemies/start/exit all act as blockers, keeping shelters off occupied cells
+- Candidates are `PATH` cells at least 8 Manhattan distance from start, spread with `SHELTER_MIN_DISTANCE = 10`
+- Stored as a placed object (`state.shelters[]`) with an O(1) lookup `state.shelterSet`, like keys/torches — the grid and cell types (WALL/PATH/EXIT/START) are unchanged
+- The rule is enforced in `canPlaceEnemy`: any candidate whose size×size footprint overlaps a shelter is rejected. This single check covers normal movement, the fleeing double-step, and respawn (all call `canPlaceEnemy`). Initial enemy spawn runs before shelters exist, so it uses an empty-set placeholder
+- `checkEnemyCollisions` is unchanged: it is positional, and since enemies cannot co-occupy a shelter, contact there is impossible
+- Rendered as a pure-CSS green 2px frame (`.cell-shelter::before`), like START/EXIT — no SVG sprite. The frame is drawn above `visited` so it stays a persistent safe marker; the player sprite renders on top (higher z-index)
+- A shelter is still a normal `PATH` dot: stepping on it scores `+1` and counts toward visited/walkable like any other cell
+
 ### Scoring
 
 - `+1` per new cell visited (first time stepping on it)
@@ -235,6 +247,7 @@ flowchart TD
   - Container border: `#00cdcd` (cyan) glow
   - Fog: `#1a1a2e`
   - Exit: locked grate before keys, open green pixel door after keys
+  - Shelters: pure-CSS green 2px frame, a safe cell enemies cannot enter
   - Powerups: editable 36x36 SVG icons rendered directly in the cell
   - Keys and lit torches: separate editable map-object SVG sprites
 - Cell size: `--cell-size: 36px` everywhere
