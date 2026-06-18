@@ -89,6 +89,38 @@
         };
     }
 
+    // Continue the exact same mulberry32 sequence from a saved u32 state.
+    // Used after wasm generate_maze so enemy/key/powerup placement stays
+    // deterministic and matches the pure-JS reference path.
+    function createRngFromState(initialState) {
+        let t = initialState >>> 0;
+        return () => {
+            t += 0x6D2B79F5;
+            let x = t;
+            x = Math.imul(x ^ (x >>> 15), x | 1);
+            x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+            return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    // ─── wasm core (optional) ─────────────────────────────────────────────
+    // When the wasm build of laby-core is present, maze generation runs there.
+    // Falls back to the JS implementation below if wasm is unavailable or fails.
+    let wasmCore = null;
+    let wasmLoading = null;
+    function loadWasmCore() {
+        if (wasmCore || wasmLoading) return wasmLoading;
+        if (typeof wasm_bindgen !== 'function') return Promise.resolve(null);
+        wasmLoading = wasm_bindgen('assets/wasm/laby_core_bg.wasm').then(() => {
+            wasmCore = wasm_bindgen.generate_maze ? wasm_bindgen : null;
+            return wasmCore;
+        }).catch(e => {
+            console.warn('wasm core load failed, using JS fallback:', e);
+            return null;
+        });
+        return wasmLoading;
+    }
+
     function createMazeGrid(w, h) {
         const grid = new Uint8Array(w * h);
         grid.fill(WALL);
@@ -151,6 +183,27 @@
         }
 
         return {grid, w, h, startPos: {x: 1, y: startY}, exitPos: {x: exitX, y: exitY}};
+    }
+
+    // wasm-backed maze generation. Returns the same shape as generateMaze().
+    // Also advances the shared `rng` to the state the wasm generator left,
+    // so subsequent enemy/key/powerup placement stays deterministic.
+    function generateMazeWasm(width, height, seed) {
+        const result = wasmCore.generate_maze(width, height, seed);
+        // Continue the PRNG from where wasm left off, replacing the seed-based
+        // rng that newGame() set up. This keeps all downstream placement
+        // byte-identical to the pure-JS reference path.
+        rng = createRngFromState(result.rng_state);
+        const grid = result.grid();
+        // Free the wasm-side Maze struct; we hold a JS copy of grid + coords now.
+        result.free();
+        return {
+            grid,
+            w: result.width,
+            h: result.height,
+            startPos: {x: result.start_x, y: result.start_y},
+            exitPos: {x: result.exit_x, y: result.exit_y},
+        };
     }
 
     function shuffleArray(arr) {
@@ -276,7 +329,9 @@
     }
 
     function createGame(width = 71, height = 41) {
-        const maze = generateMaze(width, height);
+        const maze = wasmCore
+            ? generateMazeWasm(width, height, currentSeed)
+            : generateMaze(width, height);
         const totalCells = maze.w * maze.h;
         const cfg = DIFFICULTY[difficulty];
         const enemies = [];
@@ -2151,6 +2206,9 @@
     });
 
     initPerfOverlay();
+    // Kick off wasm core loading in the background. The first game may start
+    // on the JS fallback if the user is quick; subsequent games use wasm.
+    loadWasmCore();
 
     $('#btn-new-after-win').addEventListener('click', showDifficulty);
     $('#btn-show-short-track').addEventListener('click', showShortTrack);

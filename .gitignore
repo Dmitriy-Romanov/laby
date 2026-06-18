@@ -1,3 +1,10 @@
 .DS_Store
 IDEAS.md
 .kilo/
+
+# Rust/wasm build artifacts. Keep the crate sources (wasm/Cargo.toml,
+# wasm/src/) and the shipped binary (assets/wasm/), but not intermediate
+# cargo/wasm-pack output.
+wasm/target/
+wasm/pkg/
+

@@ -88,6 +88,9 @@ run_direct_command() {
             printf '\nRecent commits:\n\n'
             git log --oneline --decorate --graph --all -n 12
             ;;
+        8|wasm)
+            build_wasm
+            ;;
         help|-h|--help)
             printf 'Usage: ./laby.sh [command]\n\n'
             printf 'Commands:\n'
@@ -98,6 +101,7 @@ run_direct_command() {
             printf '  5, server      Start local server\n'
             printf '  6, sprites     List editable sprites\n'
             printf '  7, branches    Show branches and recent commits\n'
+            printf '  8, wasm        Rebuild wasm core (wasm/src/lib.rs -> assets/wasm)\n'
             printf '\nWithout command, interactive menu is shown.\n'
             ;;
         *)
@@ -278,6 +282,40 @@ list_sprites() {
     pause
 }
 
+build_wasm() {
+    print_header
+    if ! command -v wasm-pack >/dev/null 2>&1; then
+        printf 'ERROR: wasm-pack is not installed.\n'
+        printf 'Install with: cargo install wasm-pack\n'
+        pause
+        return 1
+    fi
+
+    printf 'Building wasm core from wasm/src/lib.rs...\n\n'
+    (cd wasm && wasm-pack build --target no-modules --release) || {
+        printf '\nwasm build failed.\n'
+        pause
+        return 1
+    }
+
+    printf '\nCopying artifacts to assets/wasm/...\n'
+    mkdir -p assets/wasm
+    cp wasm/pkg/laby_core_bg.wasm assets/wasm/ || {
+        printf 'ERROR: copy of .wasm failed.\n'
+        pause
+        return 1
+    }
+    cp wasm/pkg/laby_core.js assets/wasm/ || {
+        printf 'ERROR: copy of laby_core.js failed.\n'
+        pause
+        return 1
+    }
+
+    printf '\nwasm core rebuilt and copied to assets/wasm/.\n'
+    ls -lh assets/wasm/laby_core_bg.wasm
+    pause
+}
+
 if [ "$#" -gt 0 ]; then
     run_direct_command "$1"
     exit $?
@@ -296,6 +334,7 @@ while :; do
     printf '9) Show branches and recent commits\n'
     printf '10) Create and switch to new branch\n'
     printf '11) Switch to main\n'
+    printf '12) Rebuild wasm core\n'
     printf '0) Exit\n'
     printf '\nChoose: '
     read -r choice
@@ -341,6 +380,9 @@ while :; do
             ;;
         11)
             switch_to_main
+            ;;
+        12)
+            build_wasm
             ;;
         0)
             exit 0
