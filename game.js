@@ -2086,11 +2086,20 @@
         newGame(w, h, seed);
     });
 
+    // Coalesce resize events to one render per animation frame; updateCamera/
+    // applyPositions force layout (getComputedStyle) so running them on every
+    // resize event during a window drag causes layout thrash.
+    let resizeRafQueued = false;
     window.addEventListener('resize', () => {
-        if (state) {
-            updateCamera(state);
-            applyPositions();
-        }
+        if (!state || resizeRafQueued) return;
+        resizeRafQueued = true;
+        requestAnimationFrame(() => {
+            resizeRafQueued = false;
+            if (state) {
+                updateCamera(state);
+                applyPositions();
+            }
+        });
     });
 
     // Auto-pause the active game when the tab is hidden (timer keeps running
