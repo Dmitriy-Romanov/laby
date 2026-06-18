@@ -50,6 +50,8 @@
     function sfxAllKeys() { [0, 85, 170, 255, 340].forEach((d, i) => setTimeout(() => beep([660, 880, 990, 1175, 1320][i], 0.09, 'square', 0.16), d)); }
     function sfxWin() { [0, 80, 160, 240, 320].forEach((d, i) => setTimeout(() => beep(300 + i * 150, 0.1, 'square', 0.18), d)); }
     function sfxDeath() { [0, 90, 180, 270].forEach((d, i) => setTimeout(() => beep(180 - i * 35, 0.15, 'square', 0.2), d)); }
+    // Calm ascending arpeggio (C5-E5-G5-C6) — plays when entering a shelter.
+    function sfxShelter() { [0, 110, 220, 330].forEach((d, i) => setTimeout(() => beep([523, 659, 784, 1047][i], 0.14, 'square', 0.12), d)); }
 
     // ─── Maze Generation ─────────────────────────────────────────────────────
     const WALL = 0;
@@ -926,6 +928,7 @@
     const inputSeed = $('#input-seed');
 
     let moving = false;
+    let wasInShelter = false;
     let tickInterval = null;
     let timerInterval = null;
     let state = null;
@@ -1956,6 +1959,7 @@
     function newGame(width, height, seed = makeSeed()) {
         initAudio();
         stopShortTrack();
+        wasInShelter = false;
         pausedDuration = 0;
         pauseStart = 0;
         setPaused(false);
@@ -2004,7 +2008,14 @@
                     if (pu === 'xray') flashScreen();
                     sfxCollect();
                 } else if (!keyCollected) {
-                    sfxStep();
+                    // Entering a shelter plays a calm arpeggio instead of the
+                    // step sound; staying inside is silent (edge-triggered).
+                    const inShelterNow = state.shelterSet.has(state.px + ',' + state.py);
+                    if (inShelterNow && !wasInShelter) {
+                        sfxShelter();
+                    } else {
+                        sfxStep();
+                    }
                 }
                 revealAround(state, state.px, state.py);
                 const m = state.maze;
@@ -2013,6 +2024,8 @@
                     else showCollectPopup('KEYS REQUIRED');
                 }
             }
+            // Track shelter occupancy for the edge-triggered enter sound.
+            wasInShelter = state.shelterSet.has(state.px + ',' + state.py);
 
             checkEnemyCollisions(state);
             renderMaze();
