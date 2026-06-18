@@ -222,6 +222,7 @@
     const PU_DENSITY = 100;
     const KEY_DENSITY = 800;
     const HUNTER_DENSITY = 800;
+    const SHELTER_MIN_DISTANCE = 10;
     const DIFFICULTY = {
         beginner: {width: 51, height: 31, enemyDensity: 0, chaseEvery: 0, hunterChaseEvery: 0, enemies: false},
         easy:   {width: 71, height: 41, enemyDensity: 800, chaseEvery: 10, hunterChaseEvery: 8},
@@ -305,6 +306,8 @@
             collectedKeys: 0,
             powerups: [],
             torches: [],
+            shelters: [],
+            shelterSet: new Set(),
             effects: {},
             replayKeys: null,
             footprints: new Set(),
@@ -330,6 +333,7 @@
         // marks the destination; returning to start later marks it for real.
         placeKeys(state);
         placePowerups(state);
+        placeShelters(state);
         return state;
     }
 
@@ -348,7 +352,14 @@
             a.y < b.y + b.h + pad && a.y + a.h + pad > b.y;
     }
 
-    function canPlaceEnemy(enemies, idx, candidate) {
+    function canPlaceEnemy(state, enemies, idx, candidate) {
+        // Enemies may never occupy a shelter cell (any cell covered by their
+        // size×size footprint). Checked first since it's cheaper than overlap.
+        for (let dy = 0; dy < candidate.size; dy++) {
+            for (let dx = 0; dx < candidate.size; dx++) {
+                if (state.shelterSet.has((candidate.x + dx) + ',' + (candidate.y + dy))) return false;
+            }
+        }
         const now = Date.now();
         const rect = enemyRect(candidate);
         for (let i = 0; i < enemies.length; i++) {
@@ -358,6 +369,11 @@
         }
         return true;
     }
+
+    // Initial enemy spawn runs before shelters exist (placeEnemies executes
+    // early in createGame, before placeShelters), so there are no shelters to
+    // avoid yet. Pass this stub to satisfy canPlaceEnemy's signature.
+    const SPAWN_PLACEHOLDER = {shelterSet: new Set()};
 
     function placeEnemies(maze, count, type, size, chaseEvery, existing) {
         const enemies = [];
@@ -375,7 +391,7 @@
                 for (let x = xS; x < xE; x++) {
                     if (maze.grid[y * maze.w + x] === PATH) {
                         const candidate = {x, y, size};
-                        if (!canPlaceEnemy(occupied, -1, candidate)) continue;
+                        if (!canPlaceEnemy(SPAWN_PLACEHOLDER, occupied, -1, candidate)) continue;
                         const d = Math.abs(x - cx) + Math.abs(y - cy);
                         if (d < bestDist) { bestDist = d; bestX = x; bestY = y; }
                     }
@@ -480,6 +496,41 @@
         }
         state.totalPowerups = state.powerups.length;
         state.totalGoodPowerups = state.powerups.filter(p => PU_GOOD_TYPES.has(p.type)).length;
+    }
+
+    // Shelters: safe cells the player can stand on; enemies cannot enter them.
+    // Count mirrors keys. Placed last so keys/powerups/enemies/start/exit all
+    // act as blockers, keeping shelters off occupied cells.
+    function placeShelters(state) {
+        const m = state.maze;
+        const blocked = new Set([
+            ...state.keys.map(k => k.x + ',' + k.y),
+            ...state.powerups.map(p => p.x + ',' + p.y),
+        ]);
+        const candidates = [];
+        for (let y = 2; y < m.h - 2; y++) {
+            for (let x = 2; x < m.w - 2; x++) {
+                if (m.grid[y * m.w + x] !== PATH) continue;
+                if (blocked.has(x + ',' + y)) continue;
+                if (Math.abs(x - state.px) + Math.abs(y - state.py) < 8) continue;
+                candidates.push({x, y});
+            }
+        }
+        shuffleArray(candidates);
+        const count = Math.min(state.totalKeys, candidates.length);
+        const distance = spreadDistance(m.w * m.h, count, SHELTER_MIN_DISTANCE);
+        const blockers = [
+            ...state.keys,
+            ...state.powerups,
+            ...state.enemies.map(e => ({x: e.x, y: e.y})),
+            m.startPos,
+            m.exitPos,
+        ];
+        const cells = selectSpreadCells(candidates, count, distance, blockers);
+        for (const c of cells) {
+            state.shelters.push({x: c.x, y: c.y});
+            state.shelterSet.add(c.x + ',' + c.y);
+        }
     }
 
     // Half-extent of the square of cells revealed around the player (not a
@@ -646,13 +697,13 @@
                 const nx2 = e.x + dx * 2;
                 const ny2 = e.y + dy * 2;
                 if (nx2 >= e.minX && nx2 <= e.maxX && ny2 >= e.minY && ny2 <= e.maxY &&
-                    canPlaceEnemy(state.enemies, state.enemies.indexOf(e), {...e, x: nx2, y: ny2})) {
+                    canPlaceEnemy(state, state.enemies, state.enemies.indexOf(e), {...e, x: nx2, y: ny2})) {
                     nx = nx2;
                     ny = ny2;
                 }
             }
             if (nx >= e.minX && nx <= e.maxX && ny >= e.minY && ny <= e.maxY &&
-                canPlaceEnemy(state.enemies, state.enemies.indexOf(e), {...e, x: nx, y: ny})) {
+                canPlaceEnemy(state, state.enemies, state.enemies.indexOf(e), {...e, x: nx, y: ny})) {
                 e.x = nx;
                 e.y = ny;
             } else {
@@ -673,7 +724,7 @@
             for (let x = enemy.minX; x <= enemy.maxX; x++) {
                 if (m.grid[y * m.w + x] !== PATH) continue;
                 const candidate = {...enemy, x, y, inactiveUntil: 0};
-                if (!canPlaceEnemy(state.enemies, idx, candidate)) continue;
+                if (!canPlaceEnemy(state, state.enemies, idx, candidate)) continue;
                 candidates.push({x, y, dist: Math.abs(x - state.px) + Math.abs(y - state.py)});
             }
         }
@@ -1505,6 +1556,7 @@
                 const isStart = ch === START;
                 const pu = puMap[pos];
                 const torch = torchMap[pos];
+                const shelter = state.shelterSet.has(pos);
                 const isVisited = state.visited.has(x + ',' + y);
                 const isFootprint = state.footprints.has(x + ',' + y);
 
@@ -1517,6 +1569,8 @@
                     cls += 'cell-powerup-' + pu;
                 } else if (torch) {
                     cls += 'cell-torch';
+                } else if (shelter) {
+                    cls += 'cell-shelter';
                 } else if (isVisited || isFootprint) {
                     cls += isVisited ? 'cell-visited' : 'cell-footprint';
                     if (ch === WALL) cls += ' cell-wall';
@@ -1812,6 +1866,7 @@
             replayKeys: state.replayKeys ? state.replayKeys.map(k => ({...k})) : null,
             powerups: state.powerups.map(p => ({...p})),
             torches: state.torches.map(t => ({...t})),
+            shelters: state.shelters.map(s => ({...s})),
             enemies: state.enemies.map(e => ({...e})),
             effects: {...state.effects},
             flags: {
