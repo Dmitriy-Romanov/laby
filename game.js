@@ -111,7 +111,7 @@
     function loadWasmCore() {
         if (wasmCore || wasmLoading) return wasmLoading;
         if (typeof wasm_bindgen !== 'function') return Promise.resolve(null);
-        wasmLoading = wasm_bindgen('assets/wasm/laby_core_bg.wasm').then(() => {
+        wasmLoading = wasm_bindgen({module_or_path: 'assets/wasm/laby_core_bg.wasm'}).then(() => {
             wasmCore = wasm_bindgen.generate_maze ? wasm_bindgen : null;
             return wasmCore;
         }).catch(e => {
