@@ -953,6 +953,14 @@
         return statDigits(a, sizeA) + '<span class="stat-sep">/</span>' + statDigits(b, sizeB);
     }
 
+    // Cache for setStatHTML — avoids re-parsing the same HTML every frame.
+    const statHtmlCache = Object.create(null);
+    function setStatHTML(el, html) {
+        if (statHtmlCache[el] === html) return;
+        statHtmlCache[el] = html;
+        el.innerHTML = html;
+    }
+
     function renderIconBar(el, total, filled, symbol, activeClass) {
         if (!el) return;
         const safeTotal = Math.max(0, total);
@@ -1504,10 +1512,10 @@
         updateCamera(state);
         applyPositions();
 
-        scoreEl.innerHTML = statDigits(state.score, 4);
-        movesEl.innerHTML = statDigits(state.moveCount, 4);
-        powerupsEl.innerHTML = statRatio(state.collectedPowerups, 2, state.totalPowerups, 2);
-        dotsEl.innerHTML = statRatio(state.visited.size, 3, countWalkableCells(), 3);
+        setStatHTML(scoreEl, statDigits(state.score, 4));
+        setStatHTML(movesEl, statDigits(state.moveCount, 4));
+        setStatHTML(powerupsEl, statRatio(state.collectedPowerups, 2, state.totalPowerups, 2));
+        setStatHTML(dotsEl, statRatio(state.visited.size, 3, countWalkableCells(), 3));
         renderIconBar(livesBarEl, START_LIVES, state.lives, '♥', 'is-life-on');
         renderIconBar(keysBarEl, state.totalKeys, renderCollectedKeys, '⚿', 'is-key-on');
 
