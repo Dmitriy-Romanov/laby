@@ -195,6 +195,9 @@
     // ─── Game State ──────────────────────────────────────────────────────────
     const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'away'];
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
+    // Powerup types that grant an ability (not score). These count toward the
+    // final powerups bonus; bonus/life/keyscan convert to score, so they're excluded.
+    const PU_GOOD_TYPES = new Set(['vision', 'freeze', 'xray', 'away', 'torch']);
     const BONUS_POINTS = 10;
     const KEY_SCAN_BONUS_POINTS = 2;
     const LIFE_BONUS_POINTS = 4;
@@ -473,7 +476,7 @@
             state.powerups.push({x: c.x, y: c.y, type: ptype});
         }
         state.totalPowerups = state.powerups.length;
-        state.totalGoodPowerups = state.totalPowerups;
+        state.totalGoodPowerups = state.powerups.filter(p => PU_GOOD_TYPES.has(p.type)).length;
     }
 
     // Half-extent of the square of cells revealed around the player (not a
@@ -740,7 +743,7 @@
                 }
                 state.powerups.splice(i, 1);
                 state.collectedPowerups++;
-                if (type !== 'life-bonus' && type !== 'keyscan-bonus') {
+                if (PU_GOOD_TYPES.has(p.type)) {
                     state.collectedGoodPowerups++;
                 }
                 return type;
