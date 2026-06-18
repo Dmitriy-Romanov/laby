@@ -4,6 +4,10 @@ Pure static web game (no backend, no build step). Open `index.html` in a browser
 
 ## What's new
 
+### v1.2
+- **Shelter sound.** Entering a shelter now plays a short calm arpeggio (C-E-G-C) instead of the plain step sound — stepping to safety has audible feedback.
+- **Mobile layout stability.** The UI no longer jumps when the browser's address bar shows/hides during a vertical swipe: the layout uses the smallest viewport height, so the HUD always fits. Also uses the full screen including notches.
+
 ### v1.1
 - **Swipe controls.** On touch devices, swipe anywhere in the play area to move — no need to reach for the on-screen D-pad (which often sat on top of the player start). One swipe = one move; no diagonals. The D-pad is still available alongside.
 - **Cleaner "Show short track" replay.** After winning, the optimal-route replay now runs over clean cells instead of the player's leftover visited dots and uncollected powerups.
