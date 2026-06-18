@@ -91,6 +91,12 @@ run_direct_command() {
         8|wasm)
             build_wasm
             ;;
+        9|run|browser)
+            start_server_wasm
+            ;;
+        10|open|file)
+            open_file
+            ;;
         help|-h|--help)
             printf 'Usage: ./laby.sh [command]\n\n'
             printf 'Commands:\n'
@@ -98,10 +104,12 @@ run_direct_command() {
             printf '  2, svg         Check SVG XML syntax\n'
             printf '  3, check       Run all checks\n'
             printf '  4, status      Show git status\n'
-            printf '  5, server      Start local server\n'
+            printf '  5, server      Start local server (port 8081)\n'
             printf '  6, sprites     List editable sprites\n'
             printf '  7, branches    Show branches and recent commits\n'
             printf '  8, wasm        Rebuild wasm core (wasm/src/lib.rs -> assets/wasm)\n'
+            printf '  9, run         Run in browser via local server (port 8082)\n'
+            printf '  10, open       Open index.html via file://\n'
             printf '\nWithout command, interactive menu is shown.\n'
             ;;
         *)
@@ -275,6 +283,43 @@ start_server() {
     python3 -m http.server "$port"
 }
 
+# Open the game via http:// so the wasm core loads through fetch (needed for
+# the wasm-bindgen glue). Launches the default browser and starts the server.
+start_server_wasm() {
+    print_header
+    port=8082
+    url="http://127.0.0.1:${port}/"
+    printf 'Starting server for the wasm build on %s\n' "$url"
+    printf 'The wasm core (assets/wasm/) loads via fetch; if it is missing or\n'
+    printf 'fails, the game silently falls back to the JS generator.\n'
+    printf 'Open the DevTools console to confirm "wasm" path is active.\n'
+    printf 'Stop the server with Ctrl+C.\n\n'
+    # Open the browser first, then block on the server.
+    if command -v open >/dev/null 2>&1; then
+        (sleep 1 && open "$url") &
+    fi
+    python3 -m http.server "$port"
+}
+
+# Open the local index.html directly via file://. Works because the project
+# has no build step and the wasm glue uses --target no-modules (file://-safe).
+open_file() {
+    print_header
+    index="$(pwd)/index.html"
+    if [ ! -f "$index" ]; then
+        printf 'ERROR: index.html not found in %s\n' "$(pwd)"
+        pause
+        return 1
+    fi
+    printf 'Opening %s\n' "$index"
+    if command -v open >/dev/null 2>&1; then
+        open "file://$index"
+    else
+        printf 'No "open" command on this OS; open this path manually:\n  %s\n' "$index"
+    fi
+    pause
+}
+
 list_sprites() {
     print_header
     printf 'Editable sprites:\n\n'
@@ -335,6 +380,8 @@ while :; do
     printf '10) Create and switch to new branch\n'
     printf '11) Switch to main\n'
     printf '12) Rebuild wasm core\n'
+    printf '13) Run in browser (local server, port 8082)\n'
+    printf '14) Open index.html via file://\n'
     printf '0) Exit\n'
     printf '\nChoose: '
     read -r choice
@@ -383,6 +430,12 @@ while :; do
             ;;
         12)
             build_wasm
+            ;;
+        13)
+            start_server_wasm
+            ;;
+        14)
+            open_file
             ;;
         0)
             exit 0
