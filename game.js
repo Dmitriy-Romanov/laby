@@ -990,7 +990,11 @@
             stopTick();
             stopTimer();
         } else {
-            if (pauseStart) pausedDuration += Date.now() - pauseStart;
+            // Only accrue paused time while the run timer is actually running.
+            // Pauses opened before the first move (timerStarted === false) must
+            // not inflate pausedDuration, or gameElapsed() goes negative once
+            // startTime is later set in move().
+            if (pauseStart && state && state.timerStarted) pausedDuration += Date.now() - pauseStart;
             pauseStart = 0;
             if (state && !state.dead && !state.won) { startTick(); startTimer(); }
         }
