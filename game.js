@@ -210,7 +210,8 @@
     const SCORE_LEVELS = ['easy', 'medium', 'hard'];
     const SCORE_LIMIT = 5;
     const SCORE_NAME_LIMIT = 7;
-    const TSP_CAP = 12;
+    // Max keys for exact (Held-Karp, O(2^N * N)) key ordering; above this, fall back to nearest-neighbor.
+    const TSP_CAP = 10;
     const SPREAD_FACTOR = 0.55;
     const HUNTER_CHASE_NOISE = 0.45;
     const RANDOM_DIR_CHANGE_CHANCE = 0.25;
@@ -1043,7 +1044,7 @@
     }
 
     function exactKeyOrder(keys) {
-        if (keys.length > 12) return nearestKeyOrder(keys);
+        if (keys.length > TSP_CAP) return nearestKeyOrder(keys);
         const points = [state.maze.startPos, ...keys, state.maze.exitPos];
         const distances = Array.from({length: points.length}, () => []);
         for (let i = 0; i < points.length; i++) {
@@ -1078,7 +1079,7 @@
         try {
         if (state.shortTrackRoute) return state.shortTrackRoute;
         const keys = state.keys.map(k => ({x: k.x, y: k.y}));
-        const orderedKeys = keys.length <= 10 ? exactKeyOrder(keys) : nearestKeyOrder(keys); // exactKeyOrder: O(2^N * N) memo — safe up to 10 keys
+        const orderedKeys = keys.length <= TSP_CAP ? exactKeyOrder(keys) : nearestKeyOrder(keys);
         state.shortTrackRoute = concatRouteSegments([state.maze.startPos, ...orderedKeys, state.maze.exitPos]);
         return state.shortTrackRoute;
         } finally {
