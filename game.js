@@ -115,7 +115,13 @@
             wasmCore = wasm_bindgen.generate_maze ? wasm_bindgen : null;
             return wasmCore;
         }).catch(e => {
-            console.warn('wasm core load failed, using JS fallback:', e);
+            // file:// can't fetch() the wasm binary (CORS on file origins) —
+            // expected, not an error. Anything else is worth a warning.
+            if (location.protocol === 'file:') {
+                console.info('wasm core needs http:// (file:// is CORS-blocked); running in JS mode.');
+            } else {
+                console.warn('wasm core load failed, using JS fallback:', e);
+            }
             return null;
         });
         return wasmLoading;

@@ -19,7 +19,8 @@ The migration is **byte-for-byte deterministic** vs. the JS reference: the same 
 
 ### What works today
 - `wasm/` Rust crate (`laby-core`): `generate_maze(width, height, seed) -> Maze`.
-- Compiled artifact committed at `assets/wasm/laby_core_bg.wasm` (16 KB) + the wasm-bindgen JS glue at `assets/wasm/laby_core.js` (11 KB), loaded as a plain `<script>` (`--target no-modules`, so `file://` still works).
+- Compiled artifact committed at `assets/wasm/laby_core_bg.wasm` (16 KB) + the wasm-bindgen JS glue at `assets/wasm/laby_core.js` (11 KB), loaded as a plain `<script>` (`--target no-modules`, so no ES modules are required).
+- **`file://` runs in JS-only mode; `http://` runs in wasm mode.** The glue loads as a script on `file://`, but it then calls `fetch()` to pull the `.wasm` binary, and browsers block `fetch()` across `file:` origins (CORS, "unique security origin"). The `loadWasmCore()` catch handler logs a warning and sets `wasmCore = null`, so `createGame` transparently falls back to the pure-JS `generateMaze`. The game is fully playable either way; only the path differs. To exercise the wasm path, serve the folder over http (`./laby.sh run` → `http://127.0.0.1:8082/`, or `python3 -m http.server`).
 - `game.js` calls the wasm path when ready and **falls back to the original JS `generateMaze()`** if wasm isn't loaded yet or fails. The first game of a session may start on JS fallback while wasm streams in the background; subsequent games use wasm.
 - 8 Rust unit tests (`cargo test` in `wasm/`) covering determinism, start/exit placement, dimension clamping, walkability.
 - `laby.sh` has a `wasm` command / menu item to rebuild the crate.
@@ -31,7 +32,7 @@ The migration is **byte-for-byte deterministic** vs. the JS reference: the same 
 
 ---
 
-## 2. The two lessons learned (read these before touching the glue)
+## 2. The three lessons learned (read these before touching the glue)
 
 Both are real bugs that were caught and fixed. They encode wasm/Rust-specific rules that a JS developer (or an AI without wasm experience) will trip on.
 
@@ -60,6 +61,13 @@ wasm_bindgen({module_or_path: 'assets/wasm/laby_core_bg.wasm'})
 // WRONG (logs "using deprecated parameters...")
 wasm_bindgen('assets/wasm/laby_core_bg.wasm')
 ```
+
+### Lesson C — `file://` cannot load wasm; `fetch()` is CORS-blocked on file origins
+The `--target no-modules` glue loads fine as a `<script>` over `file://`, but it then calls `fetch()` to pull the `.wasm` binary, and browsers block cross-origin `fetch()` from `file:` origins ("unique security origin"). The result is a CORS error in the console and a fallback to JS. This is **not** fixable by changing the build target — `fetch`/`XHR`/`instantiateStreaming` are all blocked equally on `file:`. Two real options:
+1. Serve over `http://` (e.g. `./laby.sh run`). The intended path for wasm.
+2. Inline the wasm as base64 into the JS and instantiate from bytes (`WebAssembly.instantiate(decode(base64))`). True `file://` support, at the cost of a custom build step + ~22 KB inline. Not done; see §5 if revisited.
+
+The JS fallback is the safety net that keeps `file://` playable. Do **not** claim `file://` "works with wasm" without one of the above.
 
 ---
 

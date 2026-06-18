@@ -283,16 +283,18 @@ start_server() {
     python3 -m http.server "$port"
 }
 
-# Open the game via http:// so the wasm core loads through fetch (needed for
-# the wasm-bindgen glue). Launches the default browser and starts the server.
+# Open the game via http:// — the ONLY way to exercise the wasm core.
+# The wasm-bindgen glue calls fetch() to load the .wasm binary, and browsers
+# block fetch() on file:// origins (CORS), so file:// always falls back to JS.
+# Launches the default browser and starts the server.
 start_server_wasm() {
     print_header
     port=8082
     url="http://127.0.0.1:${port}/"
     printf 'Starting server for the wasm build on %s\n' "$url"
-    printf 'The wasm core (assets/wasm/) loads via fetch; if it is missing or\n'
-    printf 'fails, the game silently falls back to the JS generator.\n'
-    printf 'Open the DevTools console to confirm "wasm" path is active.\n'
+    printf 'wasm mode requires http:// — file:// falls back to JS (fetch blocked).\n'
+    printf 'If assets/wasm/ is missing or fails, the game falls back to JS anyway.\n'
+    printf 'Open the DevTools console to confirm the wasm path is active.\n'
     printf 'Stop the server with Ctrl+C.\n\n'
     # Open the browser first, then block on the server.
     if command -v open >/dev/null 2>&1; then
@@ -301,8 +303,9 @@ start_server_wasm() {
     python3 -m http.server "$port"
 }
 
-# Open the local index.html directly via file://. Works because the project
-# has no build step and the wasm glue uses --target no-modules (file://-safe).
+# Open the local index.html directly via file://. The game is fully playable
+# this way, but it runs in JS-only mode: the wasm core cannot load over
+# file:// (fetch() is CORS-blocked on file origins). Use ./laby.sh run for wasm.
 open_file() {
     print_header
     index="$(pwd)/index.html"
@@ -312,6 +315,7 @@ open_file() {
         return 1
     fi
     printf 'Opening %s\n' "$index"
+    printf 'Note: file:// runs in JS-only mode (wasm needs http://; see ./laby.sh run).\n'
     if command -v open >/dev/null 2>&1; then
         open "file://$index"
     else
