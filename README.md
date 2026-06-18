@@ -2,6 +2,25 @@
 
 Pure static web game (no backend, no build step). Open `index.html` in a browser.
 
+## What's new in v1.0
+
+**Reworked**
+- **Start cell is now an entrance**, not a generic floor dot. It's drawn as a distinct cyan marker and no longer counts toward the dots counter or score — even if you step back onto it later.
+- **Powerup bonus balance.** Score-granting pickups (Bonus, Life, Key Locate) no longer dilute the final "Powerups" bonus, so the end-of-run reward is both fairer and more generous.
+- **Timer accuracy.** Opening Help or other pause screens before your first move no longer makes the elapsed time go negative.
+- **Version label** on the title screen: the running version is now visible at a glance (`LABY v1.0`).
+
+**Added**
+- **Shelters.** New safe cells marked with a green frame. Step inside to hide: enemies cannot enter a shelter, regardless of their size (2×2 hunters and 3×3 patrols alike). The number of shelters matches the number of keys on the level.
+- **Auto-pause on tab switch.** The game now pauses when the browser tab is hidden and resumes only if it was the one that paused — your time bonus and enemy ticks stay correct.
+- **Reset confirmation.** The hidden `Z` shortcut (wipe high scores) now asks for confirmation first.
+
+**Improved**
+- Smoother window resizing (layout no longer thrashes on every resize event).
+- Sound reliably plays on first interaction (audio context is resumed on the user gesture).
+- HUD counters skip redundant re-renders when values don't change.
+- Cleaner code structure with a section map at the top of `game.js`.
+
 ## Files
 
 | File | Purpose |
