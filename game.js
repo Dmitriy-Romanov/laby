@@ -7,6 +7,11 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
+        // Browsers create AudioContext in 'suspended' state until a user gesture;
+        // resume() on the gesture path (this is called from move/touch handlers).
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(e => console.warn('AudioContext resume failed:', e));
+        }
     }
 
     function beep(freq, duration, type = 'square', vol = 0.18) {
@@ -23,7 +28,9 @@
             gain.connect(audioCtx.destination);
             osc.start(t);
             osc.stop(t + duration);
-        } catch (e) {}
+        } catch (e) {
+            console.warn('beep failed:', e);
+        }
     }
 
     function sfxStep() { beep(200 + Math.random() * 150, 0.04, 'square', 0.18); }
@@ -1192,7 +1199,11 @@
     function saveScoreTables() {
         try {
             localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(scoreTables));
-        } catch (e) {}
+        } catch (e) {
+            // Common in private mode or when storage quota is exceeded; degrade silently
+            // but surface it, since losing high scores is surprising to users.
+            console.warn('Could not save high scores:', e);
+        }
     }
 
     function sortScoreRows(rows) {
@@ -1798,17 +1809,21 @@
         const text = JSON.stringify(snapshot, null, 2);
         try {
             localStorage.setItem(DEBUG_SNAPSHOT_KEY, text);
-        } catch (e) {}
+        } catch (e) {
+            console.warn('Could not store debug snapshot:', e);
+        }
+        let url = null;
         try {
             const blob = new Blob([text], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
+            url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = 'laby-snapshot-' + state.seed + '-' + Date.now() + '.json';
             a.click();
-            URL.revokeObjectURL(url);
         } catch (e) {
-            try { URL.revokeObjectURL(url); } catch (_) {}
+            console.warn('Could not download debug snapshot:', e);
+        } finally {
+            if (url) { try { URL.revokeObjectURL(url); } catch (_) {} }
         }
         showCollectPopup('SNAPSHOT SAVED');
     }
