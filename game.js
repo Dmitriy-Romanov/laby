@@ -245,10 +245,7 @@
     const SHORT_TRACK_INTERVAL = 55;
     const DPAD_REPEAT_DELAY = 300;
     const DPAD_REPEAT_INTERVAL = 180;
-    const SWIPE_MIN_DISTANCE = 18;
-    // A held swipe is already a "keep going" intent (unlike a D-pad tap that may
-    // be a single move), so the repeat kicks in faster than the D-pad's 300ms.
-    const SWIPE_REPEAT_DELAY = 120;
+    const SWIPE_MIN_DISTANCE = 12;
     const PERF_METRICS = ['renderMaze', 'computeVisible', 'tickEnemies', 'buildShortTrackRoute'];
     let difficulty = 'easy';
     let currentSeed = makeSeed();
@@ -2301,11 +2298,9 @@
     let swipeStartY = 0;
     let swipeActive = false;
     let swipeDir = null;        // {dx, dy} of the current repeat, or null
-    let swipeRepeatDelay = null;
     let swipeRepeatTimer = null;
 
     function swipeStopRepeat() {
-        if (swipeRepeatDelay) { clearTimeout(swipeRepeatDelay); swipeRepeatDelay = null; }
         if (swipeRepeatTimer) { clearInterval(swipeRepeatTimer); swipeRepeatTimer = null; }
     }
 
@@ -2315,11 +2310,13 @@
         swipeStopRepeat();
         swipeDir = {dx, dy};
         move(dx, dy);
-        swipeRepeatDelay = setTimeout(() => {
-            swipeRepeatTimer = setInterval(() => {
-                if (swipeDir) move(swipeDir.dx, swipeDir.dy);
-            }, DPAD_REPEAT_INTERVAL);
-        }, SWIPE_REPEAT_DELAY);
+        // No separate start delay: the repeat uses the same cadence as the
+        // ongoing interval, so move 2 arrives ~180ms after move 1 (same gap
+        // as between later moves). A longer start delay created a perceptible
+        // pause between the first and second move of a held swipe.
+        swipeRepeatTimer = setInterval(() => {
+            if (swipeDir) move(swipeDir.dx, swipeDir.dy);
+        }, DPAD_REPEAT_INTERVAL);
     }
 
     gameAreaEl.addEventListener('touchstart', (e) => {
