@@ -1771,6 +1771,15 @@
         const route = buildShortTrackRoute();
         if (!route.length) return;
         resetReplayVisibility(state);
+        // Clear the player's actual playthrough overlay so the ghost runs over
+        // clean cells: no leftover visited dots, footprints, or powerups/torches.
+        // Keys are rendered separately via replayKeys and are not touched here.
+        // Safe because the run is already over (finalScoreApplied) and the next
+        // game builds a fresh state.
+        state.visited.clear();
+        state.footprints.clear();
+        state.powerups.length = 0;
+        state.torches.length = 0;
         state.replayKeys = state.keys.map(k => ({x: k.x, y: k.y, collected: false}));
         state.showingShortTrack = true;
         winOverlay.classList.add('hidden');
