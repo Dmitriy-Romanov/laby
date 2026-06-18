@@ -1,3 +1,9 @@
 .DS_Store
 IDEAS.md
 .kilo/
+
+# wasm experiment lives on its own branch; keep main free of it.
+# (This guard prevents accidental `git add -A` leakage if the wasm/
+# working tree is present when committing on main.)
+wasm/
+wasm_plans.md

@@ -2,7 +2,13 @@
 
 Pure static web game (no backend, no build step). Open `index.html` in a browser.
 
-## What's new in v1.0
+## What's new
+
+### v1.1
+- **Swipe controls.** On touch devices, swipe anywhere in the play area to move — no need to reach for the on-screen D-pad (which often sat on top of the player start). One swipe = one move; no diagonals. The D-pad is still available alongside.
+- **Cleaner "Show short track" replay.** After winning, the optimal-route replay now runs over clean cells instead of the player's leftover visited dots and uncollected powerups.
+
+### v1.0
 
 **Reworked**
 - **Start cell is now an entrance**, not a generic floor dot. It's drawn as a distinct cyan marker and no longer counts toward the dots counter or score — even if you step back onto it later.
