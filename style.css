@@ -289,6 +289,32 @@ body::before {
     box-shadow: 0 0 5px rgba(205, 205, 205, 0.32);
 }
 
+.cell-start {
+    background: var(--path);
+}
+
+.cell-start::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 78%;
+    height: 78%;
+    transform: translate(-50%, -50%);
+    background:
+        linear-gradient(#00cdcd 0 0) 14% 50% / 16% 84%,
+        linear-gradient(#00cdcd 0 0) 50% 86% / 72% 16%,
+        linear-gradient(#00cdcd 0 0) 50% 14% / 72% 16%,
+        linear-gradient(135deg, transparent 0 38%, #00cdcd 38% 50%, transparent 50%) 86% 50% / 30% 30%,
+        rgba(0, 0, 0, 0.6);
+    background-repeat: no-repeat;
+    border: 2px solid #00cdcd;
+    box-sizing: border-box;
+    box-shadow:
+        inset 0 0 8px rgba(0, 205, 205, 0.35),
+        0 0 10px rgba(0, 205, 205, 0.45);
+}
+
 .cell-exit {
     background: rgba(0, 255, 0, 0.16);
     animation: exit-pulse 2s ease-in-out infinite;

@@ -55,6 +55,7 @@
     const WALL = 0;
     const PATH = 1;
     const EXIT = 2;
+    const START = 3;
     let rng = Math.random;
 
     function makeSeed() {
@@ -131,6 +132,7 @@
         const exitX = w - 2;
         grid[1 * w + 1] = PATH;
         grid[(h - 2) * w + 1] = PATH;
+        grid[startY * w + 1] = START;
         grid[exitY * w + exitX] = EXIT;
 
         const candidates = [];
@@ -371,7 +373,7 @@
             let bestX = cx, bestY = cy, bestDist = Infinity;
             for (let y = 1; y < maze.h - 1; y++) {
                 for (let x = xS; x < xE; x++) {
-                    if (maze.grid[y * maze.w + x] !== WALL) {
+                    if (maze.grid[y * maze.w + x] === PATH) {
                         const candidate = {x, y, size};
                         if (!canPlaceEnemy(occupied, -1, candidate)) continue;
                         const d = Math.abs(x - cx) + Math.abs(y - cy);
@@ -669,7 +671,7 @@
         const idx = state.enemies.indexOf(enemy);
         for (let y = enemy.minY; y <= enemy.maxY; y++) {
             for (let x = enemy.minX; x <= enemy.maxX; x++) {
-                if (m.grid[y * m.w + x] === WALL) continue;
+                if (m.grid[y * m.w + x] !== PATH) continue;
                 const candidate = {...enemy, x, y, inactiveUntil: 0};
                 if (!canPlaceEnemy(state.enemies, idx, candidate)) continue;
                 candidates.push({x, y, dist: Math.abs(x - state.px) + Math.abs(y - state.py)});
@@ -786,8 +788,8 @@
 
     function markVisited(state) {
         const m = state.maze;
-        // The start cell never counts as a dot, even when revisited.
-        if (state.px === m.startPos.x && state.py === m.startPos.y) return;
+        // The START cell is the entrance, not a collectible dot: never score it.
+        if (m.grid[state.py * m.w + state.px] === START) return;
         const key = state.px + ',' + state.py;
         if (!state.visited.has(key)) {
             state.visited.add(key);
@@ -1500,12 +1502,15 @@
 
                 const ch = m.grid[y * m.w + x];
                 const isExit = x === m.exitPos.x && y === m.exitPos.y;
+                const isStart = ch === START;
                 const pu = puMap[pos];
                 const torch = torchMap[pos];
                 const isVisited = state.visited.has(x + ',' + y);
                 const isFootprint = state.footprints.has(x + ',' + y);
 
-                if (key) {
+                if (isStart) {
+                    cls += 'cell-start';
+                } else if (key) {
                     cls += 'cell-key';
                     if (scannedKey && !visible[y][x]) cls += ' cell-key-scan';
                 } else if (pu) {
@@ -1643,11 +1648,11 @@
         let count = 0;
         for (let y = 0; y < state.maze.h; y++) {
             for (let x = 0; x < state.maze.w; x++) {
-                if (state.maze.grid[y * state.maze.w + x] !== WALL) count++;
+                // Count only collectible PATH dots; START (entrance) and EXIT are not dots.
+                if (state.maze.grid[y * state.maze.w + x] === PATH) count++;
             }
         }
-        // The start cell is never a collectible dot, so exclude it from the total.
-        state.walkableCellCount = count - 1;
+        state.walkableCellCount = count;
         return state.walkableCellCount;
     }
 
@@ -1787,7 +1792,7 @@
                     let row = '';
                     for (let x = 0; x < state.maze.w; x++) {
                         const v = state.maze.grid[start + x];
-                        row += v === WALL ? '\u2588' : v === EXIT ? '$' : ' ';
+                        row += v === WALL ? '\u2588' : v === EXIT ? '$' : v === START ? '<' : ' ';
                     }
                     return row;
                 }),
