@@ -77,8 +77,14 @@ body::before {
 .app {
     display: flex;
     flex-direction: column;
+    /* 100vh on mobile includes the area under the show/hide address bar, so the
+       top HUD row scrolls off when the bar appears. svh = smallest viewport
+       (bar visible), so the layout always fits; dvh is the progressive fallback
+       for browsers without svh support (dvh == vh on desktop). */
     height: 100vh;
+    height: 100svh;
     width: 100vw;
+    width: 100svw;
     padding: 18px 24px 22px;
     gap: 8px;
 }
