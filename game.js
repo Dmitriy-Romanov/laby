@@ -245,7 +245,7 @@
     const SHORT_TRACK_INTERVAL = 55;
     const DPAD_REPEAT_DELAY = 300;
     const DPAD_REPEAT_INTERVAL = 180;
-    const SWIPE_MIN_DISTANCE = 32;
+    const SWIPE_MIN_DISTANCE = 18;
     // A held swipe is already a "keep going" intent (unlike a D-pad tap that may
     // be a single move), so the repeat kicks in faster than the D-pad's 300ms.
     const SWIPE_REPEAT_DELAY = 120;
