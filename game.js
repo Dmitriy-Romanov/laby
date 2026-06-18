@@ -855,6 +855,7 @@
     let paused = false;
     let pauseStart = 0;
     let pausedDuration = 0;
+    let autoPausedByHidden = false;
     let enemyEls = [];
     let scoreTables = loadScoreTables();
     let activeScoreTab = 'easy';
@@ -2074,6 +2075,21 @@
         if (state) {
             updateCamera(state);
             applyPositions();
+        }
+    });
+
+    // Auto-pause the active game when the tab is hidden (timer keeps running
+    // otherwise, and background setInterval is throttled, which stutters enemies).
+    document.addEventListener('visibilitychange', () => {
+        if (!state) return;
+        if (document.hidden) {
+            if (!paused) {
+                autoPausedByHidden = true;
+                setPaused(true);
+            }
+        } else if (autoPausedByHidden) {
+            autoPausedByHidden = false;
+            setPaused(false);
         }
     });
 
