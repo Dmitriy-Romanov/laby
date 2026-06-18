@@ -2006,7 +2006,9 @@
         }
         if (e.code === 'KeyZ') {
             e.preventDefault();
-            resetScoreTables();
+            if (window.confirm('Reset all high score tables? This cannot be undone.')) {
+                resetScoreTables();
+            }
             return;
         }
         if (e.code === 'KeyP') {
