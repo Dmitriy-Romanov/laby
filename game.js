@@ -1,6 +1,18 @@
 (() => {
     'use strict';
 
+    // ─── Sections ────────────────────────────────────────────────────────────
+    //   Audio            SFX via WebAudio (beep + sfx*)
+    //   Maze Generation  seeded PRNG, recursive-backtracking maze, spread utils
+    //   Game State       createGame + enemies/keys/powerups/visibility helpers
+    //   DOM Refs         cached element handles, perf overlay, pause/timer utils
+    //   Build & Render   buildGrid, renderMaze, camera/minimap, scores, short track
+    //   Game Loop        tick/timer intervals, newGame, move, win/death handling
+    //   UI Events        keyboard shortcuts, modal wiring, resize/visibility
+    //   Touch D-pad      on-screen dpad with hold-to-repeat
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─── Audio ───────────────────────────────────────────────────────────────
     let audioCtx = null;
 
     function initAudio() {
@@ -39,7 +51,7 @@
     function sfxWin() { [0, 80, 160, 240, 320].forEach((d, i) => setTimeout(() => beep(300 + i * 150, 0.1, 'square', 0.18), d)); }
     function sfxDeath() { [0, 90, 180, 270].forEach((d, i) => setTimeout(() => beep(180 - i * 35, 0.15, 'square', 0.2), d)); }
 
-    // ─── Maze Generation ────────────────────────────────────────────────
+    // ─── Maze Generation ─────────────────────────────────────────────────────
     const WALL = 0;
     const PATH = 1;
     const EXIT = 2;
@@ -180,7 +192,7 @@
         return picked.slice(0, count);
     }
 
-    // ─── Game State ────────────────────────────────────────────────────────
+    // ─── Game State ──────────────────────────────────────────────────────────
     const PU_TYPES = ['vision', 'freeze', 'xray', 'bonus', 'away'];
     const PU_DURATIONS = {vision: 15, freeze: 12, away: 5};
     const BONUS_POINTS = 10;
@@ -813,7 +825,7 @@
         };
     }
 
-    // ─── DOM Refs ──────────────────────────────────────────────────────────
+    // ─── DOM Refs ────────────────────────────────────────────────────────────
     const $ = (s) => document.querySelector(s);
     const appEl = $('.app');
     const gameAreaEl = $('.game-area');
@@ -1369,7 +1381,7 @@
         showScores(level);
     }
 
-    // ─── Build & Render ─────────────────────────────────────────────────
+    // ─── Build & Render ──────────────────────────────────────────────────────
     function buildGrid() {
         mazeEl.innerHTML = '';
         const cs = cellSize();
@@ -1829,7 +1841,7 @@
         showCollectPopup('SNAPSHOT SAVED');
     }
 
-    // ─── Game Loop ────────────────────────────────────────────────────────
+    // ─── Game Loop ───────────────────────────────────────────────────────────
     function startTick() {
         stopTick();
         tickInterval = setInterval(() => {
@@ -1929,7 +1941,7 @@
         }
     }
 
-    // ─── UI Events ────────────────────────────────────────────────────────
+    // ─── UI Events ───────────────────────────────────────────────────────────
     function openSettings() {
         settingsModal.classList.remove('hidden');
         setPaused(true);
@@ -2141,7 +2153,7 @@
         });
     });
 
-    // ─── Touch D-pad ───────────────────────────────────────────────────
+    // ─── Touch D-pad ─────────────────────────────────────────────────────────
     let dpadRepeatTimer = null;
     let dpadRepeatDelay = null;
 
