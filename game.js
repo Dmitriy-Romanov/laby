@@ -323,8 +323,9 @@
         };
 
         revealAround(state, state.px, state.py);
-        state.footprints.add(state.px + ',' + state.py);
-        state.visited.add(state.px + ',' + state.py);
+        // The start cell is NOT marked visited/footprinted: the player hasn't
+        // moved yet, so dots stays 0/total and score stays 0. The first step
+        // marks the destination; returning to start later marks it for real.
         placeKeys(state);
         placePowerups(state);
         return state;
@@ -784,6 +785,9 @@
     }
 
     function markVisited(state) {
+        const m = state.maze;
+        // The start cell never counts as a dot, even when revisited.
+        if (state.px === m.startPos.x && state.py === m.startPos.y) return;
         const key = state.px + ',' + state.py;
         if (!state.visited.has(key)) {
             state.visited.add(key);
@@ -1642,7 +1646,8 @@
                 if (state.maze.grid[y * state.maze.w + x] !== WALL) count++;
             }
         }
-        state.walkableCellCount = count;
+        // The start cell is never a collectible dot, so exclude it from the total.
+        state.walkableCellCount = count - 1;
         return state.walkableCellCount;
     }
 
