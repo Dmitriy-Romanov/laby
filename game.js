@@ -243,6 +243,7 @@
     const SHORT_TRACK_INTERVAL = 55;
     const DPAD_REPEAT_DELAY = 300;
     const DPAD_REPEAT_INTERVAL = 180;
+    const SWIPE_MIN_DISTANCE = 24;
     const PERF_METRICS = ['renderMaze', 'computeVisible', 'tickEnemies', 'buildShortTrackRoute'];
     let difficulty = 'easy';
     let currentSeed = makeSeed();
@@ -2272,4 +2273,40 @@
 
         btn.addEventListener('touchcancel', () => dpadStopRepeat());
     });
+
+    // ─── Swipe controls ─────────────────────────────────────────────────────
+    // One swipe = one move(). Discrete (no hold-to-repeat, unlike the D-pad).
+    // Attached to .game-area so swipes work across the whole play viewport;
+    // touches that start on a D-pad button or an overlay are handled there
+    // first (button handlers / overlay z-index) and never reach these.
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let swipeActive = false;
+
+    gameAreaEl.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) { swipeActive = false; return; }
+        swipeStartX = e.touches[0].clientX;
+        swipeStartY = e.touches[0].clientY;
+        swipeActive = true;
+        initAudio();
+    }, {passive: true});
+
+    gameAreaEl.addEventListener('touchmove', (e) => {
+        if (!swipeActive || e.touches.length !== 1) return;
+        e.preventDefault();
+        const dx = e.touches[0].clientX - swipeStartX;
+        const dy = e.touches[0].clientY - swipeStartY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        if (Math.max(absX, absY) < SWIPE_MIN_DISTANCE) return;
+        if (absX > absY) {
+            move(dx > 0 ? 1 : -1, 0);
+        } else {
+            move(0, dy > 0 ? 1 : -1);
+        }
+        swipeActive = false;
+    }, {passive: false});
+
+    gameAreaEl.addEventListener('touchend', () => { swipeActive = false; });
+    gameAreaEl.addEventListener('touchcancel', () => { swipeActive = false; });
 })();
