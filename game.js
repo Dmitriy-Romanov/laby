@@ -290,7 +290,6 @@
             torches: [],
             effects: {},
             replayKeys: null,
-            replayCollectedKeys: 0,
             footprints: new Set(),
             visited: new Set(),
             camX: 0,
@@ -465,7 +464,9 @@
         state.totalGoodPowerups = state.totalPowerups;
     }
 
-    function effectiveRadius(state) {
+    // Half-extent of the square of cells revealed around the player (not a
+    // circular radius). Vision powerup widens the immediate square to 5x5.
+    function sightHalfExtent(state) {
         if (state.effects.vision) return 2;
         return 1;
     }
@@ -476,10 +477,6 @@
 
     function revealCellPermanent(state, x, y) {
         state.revealed[y][x] = PERMA_VISIBLE;
-    }
-
-    function revealCirclePermanent(state, cx, cy, r) {
-        revealRect(state, cx, cy, r);
     }
 
     function revealRect(state, cx, cy, r) {
@@ -519,7 +516,7 @@
     }
 
     function revealAround(state, cx, cy) {
-        const baseRadius = effectiveRadius(state);
+        const halfExtent = sightHalfExtent(state);
         const m = state.maze;
         const revealIfInside = (x, y) => {
             if (x >= 0 && x < m.w && y >= 0 && y < m.h) revealCell(state, x, y);
@@ -536,8 +533,8 @@
             return;
         }
 
-        for (let dy = -baseRadius; dy <= baseRadius; dy++) {
-            for (let dx = -baseRadius; dx <= baseRadius; dx++) {
+        for (let dy = -halfExtent; dy <= halfExtent; dy++) {
+            for (let dx = -halfExtent; dx <= halfExtent; dx++) {
                 const nx = cx + dx;
                 const ny = cy + dy;
                 revealIfInside(nx, ny);
@@ -725,7 +722,7 @@
                     if (ks === 'score') type = 'keyscan-bonus';
                 } else if (type === 'torch') {
                     state.torches.push({x: p.x, y: p.y});
-                    revealCirclePermanent(state, p.x, p.y, TORCH_RADIUS);
+                    revealRect(state, p.x, p.y, TORCH_RADIUS);
                 } else {
                     state.effects[type] = PU_DURATIONS[type];
                 }
@@ -1590,7 +1587,6 @@
         if (state) state.showingShortTrack = false;
         if (state) {
             state.replayKeys = null;
-            state.replayCollectedKeys = 0;
         }
         playerEl.classList.remove('is-replay-hidden');
     }
@@ -1603,7 +1599,6 @@
         if (!state) return;
         state.showingShortTrack = false;
         state.replayKeys = null;
-        state.replayCollectedKeys = 0;
         if (trackRunnerEl) trackRunnerEl.classList.add('hidden');
         playerEl.classList.remove('is-replay-hidden');
         renderMaze();
@@ -1686,7 +1681,6 @@
         if (!route.length) return;
         resetReplayVisibility(state);
         state.replayKeys = state.keys.map(k => ({x: k.x, y: k.y, collected: false}));
-        state.replayCollectedKeys = 0;
         state.showingShortTrack = true;
         winOverlay.classList.add('hidden');
         setPaused(true);
@@ -1801,7 +1795,6 @@
                 lives: state.lives,
                 totalKeys: state.totalKeys,
                 collectedKeys: state.collectedKeys,
-                replayCollectedKeys: state.replayCollectedKeys,
                 totalPowerups: state.totalPowerups,
                 collectedPowerups: state.collectedPowerups,
             },
