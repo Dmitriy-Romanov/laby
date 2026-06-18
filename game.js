@@ -190,20 +190,21 @@
     // so subsequent enemy/key/powerup placement stays deterministic.
     function generateMazeWasm(width, height, seed) {
         const result = wasmCore.generate_maze(width, height, seed);
-        // Continue the PRNG from where wasm left off, replacing the seed-based
-        // rng that newGame() set up. This keeps all downstream placement
-        // byte-identical to the pure-JS reference path.
-        rng = createRngFromState(result.rng_state);
+        // Read every field BEFORE result.free() — wasm/Rust has no GC, so
+        // accessing a freed struct is a use-after-free (null pointer), unlike
+        // the JS object we return. Snapshot into locals first.
+        const rngState = result.rng_state;
         const grid = result.grid();
-        // Free the wasm-side Maze struct; we hold a JS copy of grid + coords now.
+        const w = result.width;
+        const h = result.height;
+        const startPos = {x: result.start_x, y: result.start_y};
+        const exitPos = {x: result.exit_x, y: result.exit_y};
         result.free();
-        return {
-            grid,
-            w: result.width,
-            h: result.height,
-            startPos: {x: result.start_x, y: result.start_y},
-            exitPos: {x: result.exit_x, y: result.exit_y},
-        };
+        // Continue the PRNG from where wasm left off, replacing the seed-based
+        // rng that newGame() set up. Keeps downstream placement byte-identical
+        // to the pure-JS reference path.
+        rng = createRngFromState(rngState);
+        return {grid, w, h, startPos, exitPos};
     }
 
     function shuffleArray(arr) {
