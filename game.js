@@ -2288,13 +2288,36 @@
     });
 
     // ─── Swipe controls ─────────────────────────────────────────────────────
-    // One swipe = one move(). Discrete (no hold-to-repeat, unlike the D-pad).
-    // Attached to .game-area so swipes work across the whole play viewport;
-    // touches that start on a D-pad button or an overlay are handled there
-    // first (button handlers / overlay z-index) and never reach these.
+    // A swipe works like a held key: once the finger crosses the threshold in a
+    // direction, the player moves and a repeat timer arms (same cadence as the
+    // D-pad). Moving the finger to a new dominant direction while still held
+    // switches the repeat to that direction (like steering a joystick). Lift
+    // the finger to stop. Attached to .game-area; touches starting on a D-pad
+    // button or an overlay are handled there first.
     let swipeStartX = 0;
     let swipeStartY = 0;
     let swipeActive = false;
+    let swipeDir = null;        // {dx, dy} of the current repeat, or null
+    let swipeRepeatDelay = null;
+    let swipeRepeatTimer = null;
+
+    function swipeStopRepeat() {
+        if (swipeRepeatDelay) { clearTimeout(swipeRepeatDelay); swipeRepeatDelay = null; }
+        if (swipeRepeatTimer) { clearInterval(swipeRepeatTimer); swipeRepeatTimer = null; }
+    }
+
+    // First step + arm a D-pad-style repeat. Direction changes (see touchmove)
+    // call this again, so steering the finger feels like a fresh key press.
+    function swipeStartRepeat(dx, dy) {
+        swipeStopRepeat();
+        swipeDir = {dx, dy};
+        move(dx, dy);
+        swipeRepeatDelay = setTimeout(() => {
+            swipeRepeatTimer = setInterval(() => {
+                if (swipeDir) move(swipeDir.dx, swipeDir.dy);
+            }, DPAD_REPEAT_INTERVAL);
+        }, DPAD_REPEAT_DELAY);
+    }
 
     gameAreaEl.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) { swipeActive = false; return; }
@@ -2312,14 +2335,27 @@
         const absX = Math.abs(dx);
         const absY = Math.abs(dy);
         if (Math.max(absX, absY) < SWIPE_MIN_DISTANCE) return;
-        if (absX > absY) {
-            move(dx > 0 ? 1 : -1, 0);
-        } else {
-            move(0, dy > 0 ? 1 : -1);
+        // Dominant axis (no diagonals).
+        const ndx = absX > absY ? (dx > 0 ? 1 : -1) : 0;
+        const ndy = absX > absY ? 0 : (dy > 0 ? 1 : -1);
+        const sameDir = swipeDir && swipeDir.dx === ndx && swipeDir.dy === ndy;
+        if (!sameDir) {
+            // New direction (or first crossing): step + re-arm the repeat.
+            // Re-anchor to the finger so further travel is measured from here.
+            swipeStartX = e.touches[0].clientX;
+            swipeStartY = e.touches[0].clientY;
+            swipeStartRepeat(ndx, ndy);
         }
-        swipeActive = false;
     }, {passive: false});
 
-    gameAreaEl.addEventListener('touchend', () => { swipeActive = false; });
-    gameAreaEl.addEventListener('touchcancel', () => { swipeActive = false; });
+    gameAreaEl.addEventListener('touchend', () => {
+        swipeActive = false;
+        swipeDir = null;
+        swipeStopRepeat();
+    });
+    gameAreaEl.addEventListener('touchcancel', () => {
+        swipeActive = false;
+        swipeDir = null;
+        swipeStopRepeat();
+    });
 })();
