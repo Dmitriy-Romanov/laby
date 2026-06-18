@@ -1301,6 +1301,18 @@ kbd {
         0 0 18px rgba(255, 255, 0, 0.55);
 }
 
+.title-version {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    color: #00cdcd;
+    font-size: 0.85rem;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    border: 1px solid rgba(0, 205, 205, 0.5);
+    background: rgba(0, 205, 205, 0.08);
+}
+
 .difficulty-options {
     display: flex;
     flex-direction: column;
