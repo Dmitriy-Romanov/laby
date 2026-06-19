@@ -2185,6 +2185,18 @@
     helpModal.querySelector('.modal-backdrop').addEventListener('click', toggleHelp);
     $('.help-hint').addEventListener('click', toggleHelp);
 
+    // Touch-only action buttons inside Help (N / SPC). They replace the
+    // keyboard hints which are unreachable without a physical keyboard.
+    // Show difficulty / scores directly; both target functions keep pause on.
+    document.querySelectorAll('.help-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            helpModal.classList.add('hidden');
+            if (action === 'new') showDifficulty();
+            else showScores(activeScoreTab);
+        });
+    });
+
     $('#btn-generate').addEventListener('click', () => {
         const w = clampMazeSide(inputWidth.value, 71);
         const h = clampMazeSide(inputHeight.value, 41);

@@ -639,6 +639,19 @@ body.is-paused .modal-backdrop {
     .touch-pad {
         display: grid;
     }
+    /* On touch, keyboard hints in Help are useless (no N/Space keys); replace
+       them with the tappable .help-actions buttons. The keyboard shortcuts
+       themselves still work if a device has a physical keyboard (e.g. tablet) —
+       only the on-screen hint is removed. */
+    .help-card .help-row,
+    .help-card .help-shortcuts {
+        display: none;
+    }
+    .help-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+    }
 }
 
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
@@ -1240,6 +1253,45 @@ kbd {
     align-items: center;
     gap: 8px;
     white-space: nowrap;
+}
+
+/* Tappable action buttons shown in Help on touch devices instead of the
+   keyboard hints (N / Space). Hidden by default; enabled in the touch media
+   query below alongside the D-pad. */
+.help-actions {
+    display: none;
+}
+
+.help-action {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 54px;
+    padding: 8px 10px;
+    border: 2px solid #0000ff;
+    background: #000000;
+    color: #cdcdcd;
+    cursor: pointer;
+    font-family: 'Bitcount Prop Single', monospace;
+}
+
+.help-action:active {
+    background: #0000ff;
+    color: #ffff00;
+}
+
+.help-action .key-main {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.help-action .key-fn {
+    font-size: 0.7rem;
+    line-height: 1;
+    color: #cdcdcd;
 }
 
 .help-row {
