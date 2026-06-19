@@ -639,20 +639,20 @@ body.is-paused .modal-backdrop {
     .touch-pad {
         display: grid;
     }
-    /* On touch, keyboard hints in Help are useless (no N/Space keys); replace
-       them with the tappable .help-actions buttons. The keyboard shortcuts
-       themselves still work if a device has a physical keyboard (e.g. tablet) —
-       only the on-screen hint is removed. Scope to .help-controls so the
-       .help-row elements in Powerups/Scoring/Goal are left intact. Use .help-card
-       scoping on .help-actions so it wins over the unscoped default below. */
-    .help-controls .help-row,
-    .help-controls .help-shortcuts {
+    /* On touch, the Controls section (keyboard hints) is useless — no N/Space
+       keys, and movement is via swipe/D-pad. Hide the whole section, including
+       its <h3>Controls</h3> heading, and surface New game / Scores buttons in
+       the modal-actions row (next to Resume) instead. Keyboard shortcuts still
+       work if a device has a physical keyboard (e.g. tablet). */
+    .help-card .help-controls {
         display: none;
     }
-    .help-card .help-actions {
-        display: flex;
-        gap: 10px;
-        margin-top: 8px;
+    .help-card .help-action {
+        display: inline-flex;
+    }
+    /* Three equal-width action buttons (New game / Scores / Resume) on touch. */
+    .help-card .modal-actions .btn {
+        flex: 1;
     }
 }
 
@@ -1257,45 +1257,11 @@ kbd {
     white-space: nowrap;
 }
 
-/* Tappable action buttons shown in Help on touch devices instead of the
-   keyboard hints (N / Space). Hidden by default; enabled in the touch media
-   query below alongside the D-pad. */
-.help-actions {
-    display: none;
-}
-
+/* New game / Scores buttons in Help modal-actions. Hidden on desktop (where
+   the keyboard shortcuts work and Controls section is shown); revealed on
+   touch via the media query above, where they sit next to Resume. */
 .help-action {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    min-height: 54px;
-    padding: 8px 10px;
-    border: 2px solid #0000ff;
-    background: #000000;
-    color: #cdcdcd;
-    cursor: pointer;
-    font-family: 'Bitcount Prop Single', monospace;
-}
-
-.help-action:active {
-    background: #0000ff;
-    color: #ffff00;
-}
-
-.help-action .key-main {
-    position: static;
-    font-size: 1.5rem;
-    line-height: 1;
-}
-
-.help-action .key-fn {
-    position: static;
-    font-size: 0.7rem;
-    line-height: 1;
-    color: #cdcdcd;
+    display: none;
 }
 
 .help-row {
