@@ -1285,11 +1285,13 @@ kbd {
 }
 
 .help-action .key-main {
+    position: static;
     font-size: 1.5rem;
     line-height: 1;
 }
 
 .help-action .key-fn {
+    position: static;
     font-size: 0.7rem;
     line-height: 1;
     color: #cdcdcd;
