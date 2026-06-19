@@ -642,10 +642,11 @@ body.is-paused .modal-backdrop {
     /* On touch, keyboard hints in Help are useless (no N/Space keys); replace
        them with the tappable .help-actions buttons. The keyboard shortcuts
        themselves still work if a device has a physical keyboard (e.g. tablet) —
-       only the on-screen hint is removed. Use .help-card scoping so these rules
-       win over the unscoped defaults below regardless of source order. */
-    .help-card .help-row,
-    .help-card .help-shortcuts {
+       only the on-screen hint is removed. Scope to .help-controls so the
+       .help-row elements in Powerups/Scoring/Goal are left intact. Use .help-card
+       scoping on .help-actions so it wins over the unscoped default below. */
+    .help-controls .help-row,
+    .help-controls .help-shortcuts {
         display: none;
     }
     .help-card .help-actions {
