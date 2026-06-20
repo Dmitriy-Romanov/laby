@@ -1342,8 +1342,41 @@
             lives.className = 'score-lives';
             rank.textContent = index + 1;
             if (isEntry) {
+                // Desktop: styled <span> rewritten on keydown (unchanged).
                 name.classList.add('score-input');
                 name.innerHTML = scoreNameInputText();
+                // Touch: a real <input> so the virtual keyboard opens. Hidden on
+                // desktop via CSS (.score-input-touch default display:none).
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'score-name score-input-touch';
+                input.value = pendingScoreEntry.name;
+                input.maxLength = SCORE_NAME_LIMIT;
+                input.setAttribute('aria-label', 'Enter your name');
+                input.autocomplete = 'off';
+                input.spellcheck = false;
+                // Keep pendingScoreEntry.name in sync; force uppercase to match
+                // the desktop scoreInputChar behaviour. Do NOT call
+                // renderScoreTable() here — it would rebuild the DOM and drop
+                // focus / caret position in the input.
+                input.addEventListener('input', () => {
+                    pendingScoreEntry.name = input.value.toUpperCase().slice(0, SCORE_NAME_LIMIT);
+                    if (input.value !== pendingScoreEntry.name) {
+                        input.value = pendingScoreEntry.name;
+                    }
+                });
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitScoreName();
+                    }
+                });
+                li.append(rank, name, input, score, moves, lives);
+                scoreListEl.appendChild(li);
+                // Autofocus on the next tick (the <li> must be in the DOM) —
+                // on touch this summons the virtual keyboard.
+                setTimeout(() => { if (pendingScoreEntry) input.focus(); }, 0);
+                return;
             } else {
                 name.textContent = row.name;
             }

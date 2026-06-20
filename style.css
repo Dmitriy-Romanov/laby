@@ -654,6 +654,14 @@ body.is-paused .modal-backdrop {
     .help-card .modal-actions .btn {
         flex: 1;
     }
+    /* Name entry: hide the styled <span> and show the real <input> so the
+       virtual keyboard can open. */
+    .score-row .score-input {
+        display: none;
+    }
+    .score-row .score-input-touch {
+        display: inline-block;
+    }
 }
 
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
@@ -937,6 +945,28 @@ body.is-paused .modal-backdrop {
 
 .score-input {
     color: #ffff00;
+}
+
+/* Real <input> used for name entry on touch devices. Hidden by default
+   (desktop shows the styled <span>.score-input instead); revealed under the
+   same condition as the D-pad so the virtual keyboard can open. */
+.score-input-touch {
+    display: none;
+    color: #ffff00;
+    background: #000000;
+    border: 1px solid #0000ff;
+    font-family: 'Bitcount Prop Single', monospace;
+    font-size: inherit;
+    line-height: inherit;
+    padding: 2px 6px;
+    width: 7ch; /* SCORE_NAME_LIMIT characters */
+    box-sizing: content-box;
+}
+
+.score-input-touch:focus {
+    outline: none;
+    border-color: #ffff00;
+    box-shadow: 0 0 0 1px #ffff00;
 }
 
 .score-cursor {
