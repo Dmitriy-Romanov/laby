@@ -4,6 +4,9 @@ Pure static web game (no backend, no build step). Open `index.html` in a browser
 
 ## What's new
 
+### v1.31
+- **Name entry on touch.** High-score name entry now uses a real text field on touch devices, so the on-screen keyboard actually opens. Previously the entry was a non-focusable span rewritten by keydown — which silently saved "PLAYER" on phones because no keyboard could appear. Desktop entry is unchanged.
+
 ### v1.3
 - **Swipe hold-to-repeat.** Holding a swipe now keeps moving (same cadence as a held D-pad key / keyboard key), so long corridors no longer need many separate swipes. Steering the finger to a new direction switches the repeat without lifting.
 - **Adaptive Help on touch.** On touch devices, the Help modal no longer shows the useless keyboard-hint section (WASD/arrows, N/Space). Instead, "New game" and "Scores" buttons sit next to "Resume" at the bottom — the only way on a phone to reach those actions during play. Desktop Help is unchanged, and keyboard shortcuts still work on any device that has a physical keyboard.
