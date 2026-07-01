@@ -50,6 +50,8 @@
     function sfxAllKeys() { [0, 85, 170, 255, 340].forEach((d, i) => setTimeout(() => beep([660, 880, 990, 1175, 1320][i], 0.09, 'square', 0.16), d)); }
     function sfxWin() { [0, 80, 160, 240, 320].forEach((d, i) => setTimeout(() => beep(300 + i * 150, 0.1, 'square', 0.18), d)); }
     function sfxDeath() { [0, 90, 180, 270].forEach((d, i) => setTimeout(() => beep(180 - i * 35, 0.15, 'square', 0.2), d)); }
+    // Calm ascending arpeggio (C5-E5-G5-C6) — plays when entering a shelter.
+    function sfxShelter() { [0, 110, 220, 330].forEach((d, i) => setTimeout(() => beep([523, 659, 784, 1047][i], 0.14, 'square', 0.12), d)); }
 
     // ─── Maze Generation ─────────────────────────────────────────────────────
     const WALL = 0;
@@ -303,7 +305,7 @@
     const SHORT_TRACK_INTERVAL = 55;
     const DPAD_REPEAT_DELAY = 300;
     const DPAD_REPEAT_INTERVAL = 180;
-    const SWIPE_MIN_DISTANCE = 24;
+    const SWIPE_MIN_DISTANCE = 12;
     const PERF_METRICS = ['renderMaze', 'computeVisible', 'tickEnemies', 'buildShortTrackRoute'];
     let difficulty = 'easy';
     let currentSeed = makeSeed();
@@ -988,6 +990,7 @@
     const inputSeed = $('#input-seed');
 
     let moving = false;
+    let wasInShelter = false;
     let tickInterval = null;
     let timerInterval = null;
     let state = null;
@@ -1401,8 +1404,41 @@
             lives.className = 'score-lives';
             rank.textContent = index + 1;
             if (isEntry) {
+                // Desktop: styled <span> rewritten on keydown (unchanged).
                 name.classList.add('score-input');
                 name.innerHTML = scoreNameInputText();
+                // Touch: a real <input> so the virtual keyboard opens. Hidden on
+                // desktop via CSS (.score-input-touch default display:none).
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'score-name score-input-touch';
+                input.value = pendingScoreEntry.name;
+                input.maxLength = SCORE_NAME_LIMIT;
+                input.setAttribute('aria-label', 'Enter your name');
+                input.autocomplete = 'off';
+                input.spellcheck = false;
+                // Keep pendingScoreEntry.name in sync; force uppercase to match
+                // the desktop scoreInputChar behaviour. Do NOT call
+                // renderScoreTable() here — it would rebuild the DOM and drop
+                // focus / caret position in the input.
+                input.addEventListener('input', () => {
+                    pendingScoreEntry.name = input.value.toUpperCase().slice(0, SCORE_NAME_LIMIT);
+                    if (input.value !== pendingScoreEntry.name) {
+                        input.value = pendingScoreEntry.name;
+                    }
+                });
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitScoreName();
+                    }
+                });
+                li.append(rank, name, input, score, moves, lives);
+                scoreListEl.appendChild(li);
+                // Autofocus on the next tick (the <li> must be in the DOM) —
+                // on touch this summons the virtual keyboard.
+                setTimeout(() => { if (pendingScoreEntry) input.focus(); }, 0);
+                return;
             } else {
                 name.textContent = row.name;
             }
@@ -2018,6 +2054,7 @@
     function newGame(width, height, seed = makeSeed()) {
         initAudio();
         stopShortTrack();
+        wasInShelter = false;
         pausedDuration = 0;
         pauseStart = 0;
         setPaused(false);
@@ -2066,7 +2103,14 @@
                     if (pu === 'xray') flashScreen();
                     sfxCollect();
                 } else if (!keyCollected) {
-                    sfxStep();
+                    // Entering a shelter plays a calm arpeggio instead of the
+                    // step sound; staying inside is silent (edge-triggered).
+                    const inShelterNow = state.shelterSet.has(state.px + ',' + state.py);
+                    if (inShelterNow && !wasInShelter) {
+                        sfxShelter();
+                    } else {
+                        sfxStep();
+                    }
                 }
                 revealAround(state, state.px, state.py);
                 const m = state.maze;
@@ -2075,6 +2119,8 @@
                     else showCollectPopup('KEYS REQUIRED');
                 }
             }
+            // Track shelter occupancy for the edge-triggered enter sound.
+            wasInShelter = state.shelterSet.has(state.px + ',' + state.py);
 
             checkEnemyCollisions(state);
             renderMaze();
@@ -2237,6 +2283,18 @@
     helpModal.querySelector('.modal-backdrop').addEventListener('click', toggleHelp);
     $('.help-hint').addEventListener('click', toggleHelp);
 
+    // Touch-only action buttons inside Help (N / SPC). They replace the
+    // keyboard hints which are unreachable without a physical keyboard.
+    // Show difficulty / scores directly; both target functions keep pause on.
+    document.querySelectorAll('.help-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            helpModal.classList.add('hidden');
+            if (action === 'new') showDifficulty();
+            else showScores(activeScoreTab);
+        });
+    });
+
     $('#btn-generate').addEventListener('click', () => {
         const w = clampMazeSide(inputWidth.value, 71);
         const h = clampMazeSide(inputHeight.value, 41);
@@ -2340,13 +2398,36 @@
     });
 
     // ─── Swipe controls ─────────────────────────────────────────────────────
-    // One swipe = one move(). Discrete (no hold-to-repeat, unlike the D-pad).
-    // Attached to .game-area so swipes work across the whole play viewport;
-    // touches that start on a D-pad button or an overlay are handled there
-    // first (button handlers / overlay z-index) and never reach these.
+    // A swipe works like a held key: once the finger crosses the threshold in a
+    // direction, the player moves and a repeat timer arms (same cadence as the
+    // D-pad). Moving the finger to a new dominant direction while still held
+    // switches the repeat to that direction (like steering a joystick). Lift
+    // the finger to stop. Attached to .game-area; touches starting on a D-pad
+    // button or an overlay are handled there first.
     let swipeStartX = 0;
     let swipeStartY = 0;
     let swipeActive = false;
+    let swipeDir = null;        // {dx, dy} of the current repeat, or null
+    let swipeRepeatTimer = null;
+
+    function swipeStopRepeat() {
+        if (swipeRepeatTimer) { clearInterval(swipeRepeatTimer); swipeRepeatTimer = null; }
+    }
+
+    // First step + arm a D-pad-style repeat. Direction changes (see touchmove)
+    // call this again, so steering the finger feels like a fresh key press.
+    function swipeStartRepeat(dx, dy) {
+        swipeStopRepeat();
+        swipeDir = {dx, dy};
+        move(dx, dy);
+        // No separate start delay: the repeat uses the same cadence as the
+        // ongoing interval, so move 2 arrives ~180ms after move 1 (same gap
+        // as between later moves). A longer start delay created a perceptible
+        // pause between the first and second move of a held swipe.
+        swipeRepeatTimer = setInterval(() => {
+            if (swipeDir) move(swipeDir.dx, swipeDir.dy);
+        }, DPAD_REPEAT_INTERVAL);
+    }
 
     gameAreaEl.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) { swipeActive = false; return; }
@@ -2364,14 +2445,27 @@
         const absX = Math.abs(dx);
         const absY = Math.abs(dy);
         if (Math.max(absX, absY) < SWIPE_MIN_DISTANCE) return;
-        if (absX > absY) {
-            move(dx > 0 ? 1 : -1, 0);
-        } else {
-            move(0, dy > 0 ? 1 : -1);
+        // Dominant axis (no diagonals).
+        const ndx = absX > absY ? (dx > 0 ? 1 : -1) : 0;
+        const ndy = absX > absY ? 0 : (dy > 0 ? 1 : -1);
+        const sameDir = swipeDir && swipeDir.dx === ndx && swipeDir.dy === ndy;
+        if (!sameDir) {
+            // New direction (or first crossing): step + re-arm the repeat.
+            // Re-anchor to the finger so further travel is measured from here.
+            swipeStartX = e.touches[0].clientX;
+            swipeStartY = e.touches[0].clientY;
+            swipeStartRepeat(ndx, ndy);
         }
-        swipeActive = false;
     }, {passive: false});
 
-    gameAreaEl.addEventListener('touchend', () => { swipeActive = false; });
-    gameAreaEl.addEventListener('touchcancel', () => { swipeActive = false; });
+    gameAreaEl.addEventListener('touchend', () => {
+        swipeActive = false;
+        swipeDir = null;
+        swipeStopRepeat();
+    });
+    gameAreaEl.addEventListener('touchcancel', () => {
+        swipeActive = false;
+        swipeDir = null;
+        swipeStopRepeat();
+    });
 })();

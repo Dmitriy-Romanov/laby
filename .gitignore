@@ -7,4 +7,3 @@ IDEAS.md
 # cargo/wasm-pack output.
 wasm/target/
 wasm/pkg/
-

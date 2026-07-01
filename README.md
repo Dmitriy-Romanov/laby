@@ -2,7 +2,24 @@
 
 Pure static web game (no backend, no build step). Open `index.html` in a browser.
 
-## What's new in v1.0
+## What's new
+
+### v1.31
+- **Name entry on touch.** High-score name entry now uses a real text field on touch devices, so the on-screen keyboard actually opens. Previously the entry was a non-focusable span rewritten by keydown — which silently saved "PLAYER" on phones because no keyboard could appear. Desktop entry is unchanged.
+
+### v1.3
+- **Swipe hold-to-repeat.** Holding a swipe now keeps moving (same cadence as a held D-pad key / keyboard key), so long corridors no longer need many separate swipes. Steering the finger to a new direction switches the repeat without lifting.
+- **Adaptive Help on touch.** On touch devices, the Help modal no longer shows the useless keyboard-hint section (WASD/arrows, N/Space). Instead, "New game" and "Scores" buttons sit next to "Resume" at the bottom — the only way on a phone to reach those actions during play. Desktop Help is unchanged, and keyboard shortcuts still work on any device that has a physical keyboard.
+
+### v1.2
+- **Shelter sound.** Entering a shelter now plays a short calm arpeggio (C-E-G-C) instead of the plain step sound — stepping to safety has audible feedback.
+- **Mobile layout stability.** The UI no longer jumps when the browser's address bar shows/hides during a vertical swipe: the layout uses the smallest viewport height, so the HUD always fits. Also uses the full screen including notches.
+
+### v1.1
+- **Swipe controls.** On touch devices, swipe anywhere in the play area to move — no need to reach for the on-screen D-pad (which often sat on top of the player start). No diagonals. The D-pad is still available alongside.
+- **Cleaner "Show short track" replay.** After winning, the optimal-route replay now runs over clean cells instead of the player's leftover visited dots and uncollected powerups.
+
+### v1.0
 
 **Reworked**
 - **Start cell is now an entrance**, not a generic floor dot. It's drawn as a distinct cyan marker and no longer counts toward the dots counter or score — even if you step back onto it later.

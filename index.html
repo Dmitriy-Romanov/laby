@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>LABY — Maze Game</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="shortcut icon" href="assets/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css?v=1.0">
+    <link rel="stylesheet" href="style.css?v=1.31">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap" rel="stylesheet">
 </head>
@@ -98,8 +98,8 @@
 <div id="difficulty-modal" class="modal" tabindex="-1">
     <div class="modal-backdrop"></div>
     <div class="modal-card difficulty-card">
-        <div class="title-lockup" aria-label="LABY v1.0">
-            <h1>LABY <span class="title-version">v1.0</span></h1>
+        <div class="title-lockup" aria-label="LABY v1.31">
+            <h1>LABY <span class="title-version">v1.31</span></h1>
         </div>
         <h2>Select mode</h2>
         <div class="difficulty-options">
@@ -153,7 +153,7 @@
 <div id="help-modal" class="modal hidden" tabindex="-1">
     <div class="modal-backdrop"></div>
     <div class="modal-card help-card">
-        <div class="help-section">
+        <div class="help-section help-controls">
             <h3>Controls</h3>
             <div class="help-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — move</div>
             <div class="help-shortcuts">
@@ -186,12 +186,14 @@
             <div class="help-row">Green-framed cells are shelters — step in to hide; enemies cannot enter.</div>
         </div>
         <div class="modal-actions">
+            <button type="button" class="btn btn-primary help-action" data-action="new">New game</button>
+            <button type="button" class="btn btn-primary help-action" data-action="scores">Scores</button>
             <button class="btn btn-primary" id="btn-help-close">Resume</button>
         </div>
     </div>
 </div>
 
-<script src="assets/wasm/laby_core.js?v=1.0"></script>
-<script src="game.js?v=1.0"></script>
+<script src="assets/wasm/laby_core.js?v=1.31"></script>
+<script src="game.js?v=1.31"></script>
 </body>
 </html>
