@@ -542,7 +542,7 @@ body::before {
     width: calc(var(--cell-size) * 3);
     height: calc(var(--cell-size) * 3);
     border-radius: 0;
-    background: url("assets/sprites/enemy-patrol-3x3.svg") center / 100% 100% no-repeat;
+    background: url("assets/sprites/monster_3.png") center / 100% 100% no-repeat;
     image-rendering: pixelated;
     box-shadow: none;
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -559,7 +559,7 @@ body::before {
 .enemy-hunter {
     width: calc(var(--cell-size) * 2);
     height: calc(var(--cell-size) * 2);
-    background-image: url("assets/sprites/enemy-hunter-2x2.svg");
+    background-image: url("assets/sprites/monster_2.png");
 }
 
 .app.is-paused .maze-container,
