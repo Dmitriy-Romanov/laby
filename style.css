@@ -508,7 +508,7 @@ body::before {
     left: 0;
     width: var(--cell-size);
     height: var(--cell-size);
-    background: url("assets/sprites/player-hero-1x1.svg") center / 100% 100% no-repeat;
+    background: url("assets/sprites/player-hero-1x1.png") center / 100% 100% no-repeat;
     image-rendering: pixelated;
     box-shadow: none;
     transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -528,7 +528,7 @@ body::before {
     height: var(--cell-size);
     z-index: 11;
     pointer-events: none;
-    background: url("assets/sprites/player-hero-1x1.svg") center / 100% 100% no-repeat;
+    background: url("assets/sprites/player-hero-1x1.png") center / 100% 100% no-repeat;
     image-rendering: pixelated;
     transition: transform 0.08s linear;
 }
