@@ -283,6 +283,11 @@ body::before {
 
 .cell-path { background: var(--path); }
 
+/* During the short-track replay the whole maze is opened and the runner only
+   collects keys, not dots — suppress the collectible dot on path cells so a
+   collected key cell becomes a plain empty path instead of a "seed". */
+.maze.is-replay .cell-path::before { display: none; }
+
 .cell-path:not(.cell-visited):not(.cell-footprint)::before {
     content: '';
     position: absolute;

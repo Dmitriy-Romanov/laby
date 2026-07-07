@@ -58,7 +58,6 @@
     const PATH = 1;
     const EXIT = 2;
     const START = 3;
-    let rng = Math.random;
 
     function makeSeed() {
         return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0').toUpperCase();
@@ -97,7 +96,7 @@
         return grid;
     }
 
-    function generateMaze(w, h) {
+    function generateMaze(w, h, rng) {
         if (w % 2 === 0) w++;
         if (h % 2 === 0) h++;
         w = Math.max(7, w);
@@ -111,7 +110,7 @@
         while (stack.length > 0) {
             const cx = stack[stack.length - 1].x;
             const cy = stack[stack.length - 1].y;
-            shuffleArray(dirs);
+            shuffleArray(dirs, rng);
             let carved = false;
             for (const [dc, dr] of dirs) {
                 const nx = cx + dc;
@@ -146,7 +145,7 @@
                 if (horiz || vert) candidates.push({x, y});
             }
         }
-        shuffleArray(candidates);
+        shuffleArray(candidates, rng);
         const cnt = Math.max(5, Math.floor((w * h) / EXTRA_PATH_DENSITY));
         for (let i = 0; i < Math.min(cnt, candidates.length); i++) {
             grid[candidates[i].y * w + candidates[i].x] = PATH;
@@ -155,7 +154,7 @@
         return {grid, w, h, startPos: {x: 1, y: startY}, exitPos: {x: exitX, y: exitY}};
     }
 
-    function shuffleArray(arr) {
+    function shuffleArray(arr, rng) {
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(rng() * (i + 1));
             [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -278,20 +277,21 @@
         schedulePerfOverlayRender();
     }
 
-    function createGame(width = 71, height = 41) {
-        const maze = generateMaze(width, height);
+    function createGame(width = 71, height = 41, rng) {
+        const maze = generateMaze(width, height, rng);
         const totalCells = maze.w * maze.h;
         const cfg = DIFFICULTY[difficulty];
         const enemies = [];
         if (cfg.enemies !== false) {
             const enemyCount = Math.max(1, Math.floor(totalCells / cfg.enemyDensity));
             const hunterCount = Math.max(1, Math.floor(totalCells / HUNTER_DENSITY));
-            enemies.push(...placeEnemies(maze, enemyCount, 'patrol', 3, cfg.chaseEvery, []));
-            enemies.push(...placeEnemies(maze, hunterCount, 'hunter', 2, cfg.hunterChaseEvery, enemies));
+            enemies.push(...placeEnemies(maze, enemyCount, 'patrol', 3, cfg.chaseEvery, [], rng));
+            enemies.push(...placeEnemies(maze, hunterCount, 'hunter', 2, cfg.hunterChaseEvery, enemies, rng));
         }
 
         const state = {
             maze,
+            rng,
             seed: currentSeed,
             px: maze.startPos.x,
             py: maze.startPos.y,
@@ -302,8 +302,11 @@
             won: false,
             dead: false,
             enemies,
-            revealed: createEmptyGrid(maze.w, maze.h),
-            visible: createEmptyGrid(maze.w, maze.h),
+            revealed: createFlatGrid(maze.w, maze.h, -1),
+            visible: createFlatGrid(maze.w, maze.h, false),
+            revealVersion: 0,
+            visVersion: -1,
+            visMove: -1,
             keys: [],
             totalKeys: Math.max(1, Math.floor(totalCells / KEY_DENSITY)),
             collectedKeys: 0,
@@ -334,15 +337,15 @@
         // The start cell is NOT marked visited/footprinted: the player hasn't
         // moved yet, so dots stays 0/total and score stays 0. The first step
         // marks the destination; returning to start later marks it for real.
-        placeKeys(state);
-        placePowerups(state);
-        placeShelters(state);
+        placeKeys(state, rng);
+        placePowerups(state, rng);
+        placeShelters(state, rng);
         return state;
     }
 
-    function createEmptyGrid(w, h) {
-        const grid = [];
-        for (let y = 0; y < h; y++) grid[y] = new Array(w).fill(-1);
+    function createFlatGrid(w, h, fill) {
+        const grid = new Array(w * h);
+        grid.fill(fill);
         return grid;
     }
 
@@ -355,12 +358,12 @@
             a.y < b.y + b.h + pad && a.y + a.h + pad > b.y;
     }
 
-    function canPlaceEnemy(state, enemies, idx, candidate) {
+    function canPlaceEnemy(shelterSet, enemies, idx, candidate) {
         // Enemies may never occupy a shelter cell (any cell covered by their
         // size×size footprint). Checked first since it's cheaper than overlap.
         for (let dy = 0; dy < candidate.size; dy++) {
             for (let dx = 0; dx < candidate.size; dx++) {
-                if (state.shelterSet.has((candidate.x + dx) + ',' + (candidate.y + dy))) return false;
+                if (shelterSet.has((candidate.x + dx) + ',' + (candidate.y + dy))) return false;
             }
         }
         const now = Date.now();
@@ -375,10 +378,8 @@
 
     // Initial enemy spawn runs before shelters exist (placeEnemies executes
     // early in createGame, before placeShelters), so there are no shelters to
-    // avoid yet. Pass this stub to satisfy canPlaceEnemy's signature.
-    const SPAWN_PLACEHOLDER = {shelterSet: new Set()};
-
-    function placeEnemies(maze, count, type, size, chaseEvery, existing) {
+    // avoid yet — pass an empty set for shelterSet.
+    function placeEnemies(maze, count, type, size, chaseEvery, existing, rng) {
         const enemies = [];
         const stripW = maze.w / count;
         const occupied = [...(existing || [])];
@@ -394,7 +395,7 @@
                 for (let x = xS; x < xE; x++) {
                     if (maze.grid[y * maze.w + x] === PATH) {
                         const candidate = {x, y, size};
-                        if (!canPlaceEnemy(SPAWN_PLACEHOLDER, occupied, -1, candidate)) continue;
+                        if (!canPlaceEnemy(new Set(), occupied, -1, candidate)) continue;
                         const d = Math.abs(x - cx) + Math.abs(y - cy);
                         if (d < bestDist) { bestDist = d; bestX = x; bestY = y; }
                     }
@@ -420,7 +421,7 @@
         return enemies;
     }
 
-    function placeKeys(state) {
+    function placeKeys(state, rng) {
         const m = state.maze;
         const candidates = [];
         for (let y = 2; y < m.h - 2; y++) {
@@ -430,7 +431,7 @@
                 }
             }
         }
-        shuffleArray(candidates);
+        shuffleArray(candidates, rng);
         const keyCount = Math.min(state.totalKeys, candidates.length);
         const keyDistance = spreadDistance(m.w * m.h, keyCount, 14);
         const cells = selectSpreadCells(candidates, keyCount, keyDistance);
@@ -440,7 +441,7 @@
         state.totalKeys = state.keys.length;
     }
 
-    function placePowerups(state) {
+    function placePowerups(state, rng) {
         const m = state.maze;
         const candidates = [];
         const keyCells = new Set(state.keys.map(k => k.x + ',' + k.y));
@@ -452,7 +453,7 @@
                 }
             }
         }
-        shuffleArray(candidates);
+        shuffleArray(candidates, rng);
         const count = Math.min(Math.floor((m.w * m.h) / PU_DENSITY), candidates.length);
         const scanCount = Math.min(state.totalKeys * 2, count);
         const powerupDistance = spreadDistance(m.w * m.h, count, 6);
@@ -504,7 +505,7 @@
     // Shelters: safe cells the player can stand on; enemies cannot enter them.
     // Count mirrors keys. Placed last so keys/powerups/enemies/start/exit all
     // act as blockers, keeping shelters off occupied cells.
-    function placeShelters(state) {
+    function placeShelters(state, rng) {
         const m = state.maze;
         const blocked = new Set([
             ...state.keys.map(k => k.x + ',' + k.y),
@@ -519,7 +520,7 @@
                 candidates.push({x, y});
             }
         }
-        shuffleArray(candidates);
+        shuffleArray(candidates, rng);
         const count = Math.min(state.totalKeys, candidates.length);
         const distance = spreadDistance(m.w * m.h, count, SHELTER_MIN_DISTANCE);
         const blockers = [
@@ -544,45 +545,45 @@
     }
 
     function revealCell(state, x, y) {
-        if (state.revealed[y][x] !== PERMA_VISIBLE) state.revealed[y][x] = state.moveCount;
+        const i = y * state.maze.w + x;
+        if (state.revealed[i] !== PERMA_VISIBLE) state.revealed[i] = state.moveCount;
+        state.revealVersion++;
     }
 
     function revealCellPermanent(state, x, y) {
-        state.revealed[y][x] = PERMA_VISIBLE;
+        state.revealed[y * state.maze.w + x] = PERMA_VISIBLE;
+        state.revealVersion++;
     }
 
-    function revealRect(state, cx, cy, r) {
+    // Shared square reveal. `permanent` chooses between revealCellPermanent
+    // (PERMA_VISIBLE, never forgotten) and revealCell (temporary, ages out).
+    function revealSquare(state, cx, cy, r, permanent) {
         const m = state.maze;
         for (let dy = -r; dy <= r; dy++) {
             for (let dx = -r; dx <= r; dx++) {
                 const nx = cx + dx;
                 const ny = cy + dy;
                 if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-                    revealCellPermanent(state, nx, ny);
+                    if (permanent) revealCellPermanent(state, nx, ny);
+                    else revealCell(state, nx, ny);
                 }
             }
         }
     }
 
-    function revealAroundPermanent(state, cx, cy, r = 1) {
-        revealRect(state, cx, cy, r);
-    }
-
-    function resetReplayVisibility(state) {
-        for (let y = 0; y < state.maze.h; y++) {
-            state.revealed[y].fill(-1);
-        }
+    function revealRect(state, cx, cy, r) {
+        revealSquare(state, cx, cy, r, true);
     }
 
     function applyKeyScan(state) {
         const hiddenKeys = state.keys.filter(key =>
-            !key.collected && state.revealed[key.y][key.x] !== PERMA_VISIBLE
+            !key.collected && state.revealed[key.y * state.maze.w + key.x] !== PERMA_VISIBLE
         );
         if (!hiddenKeys.length) {
             state.score += KEY_SCAN_BONUS_POINTS;
             return 'score';
         }
-        const key = hiddenKeys[Math.floor(rng() * hiddenKeys.length)];
+        const key = hiddenKeys[Math.floor(state.rng() * hiddenKeys.length)];
         revealCellPermanent(state, key.x, key.y);
         return 'key';
     }
@@ -635,16 +636,26 @@
     function computeVisible(state) {
         const perf = perfStart('computeVisible');
         const m = state.maze;
+        const w = m.w;
         const rev = state.revealed;
         const visible = state.visible;
         try {
+            // Visibility only changes when a cell is (un)revealed (revealVersion)
+            // or when the forget window shifts (moveCount). Otherwise reuse the
+            // previously computed grid instead of scanning the whole maze.
+            if (state.visVersion === state.revealVersion && state.visMove === state.moveCount) {
+                return visible;
+            }
             for (let y = 0; y < m.h; y++) {
                 for (let x = 0; x < m.w; x++) {
-                    visible[y][x] = rev[y][x] === PERMA_VISIBLE ||
-                        (rev[y][x] >= 0 && (state.moveCount - rev[y][x]) <= FORGET_THRESHOLD);
-                    if (x === m.exitPos.x && y === m.exitPos.y) visible[y][x] = true;
+                    const i = y * w + x;
+                    visible[i] = rev[i] === PERMA_VISIBLE ||
+                        (rev[i] >= 0 && (state.moveCount - rev[i]) <= FORGET_THRESHOLD);
+                    if (x === m.exitPos.x && y === m.exitPos.y) visible[i] = true;
                 }
             }
+            state.visVersion = state.revealVersion;
+            state.visMove = state.moveCount;
             return visible;
         } finally {
             perfEnd(perf);
@@ -657,9 +668,10 @@
         if (state.won || state.dead || state.effects.freeze) return;
         const fleeing = !!state.effects.away;
         const now = Date.now();
-        for (const e of state.enemies) {
+        for (let ei = 0; ei < state.enemies.length; ei++) {
+            const e = state.enemies[ei];
             if (e.inactiveUntil && e.inactiveUntil > now) continue;
-            if (e.inactiveUntil && e.inactiveUntil <= now) respawnEnemy(state, e);
+            if (e.inactiveUntil && e.inactiveUntil <= now) respawnEnemy(state, e, ei);
             e.ticks++;
             if (fleeing) {
                 let bestDir = e.dir;
@@ -675,8 +687,8 @@
                 e.dir = bestDir;
             } else if (e.ticks % e.chaseEvery === 0) {
                 const chaseNoise = e.type === 'hunter' ? HUNTER_CHASE_NOISE : 0;
-                if (chaseNoise && rng() < chaseNoise) {
-                    e.dir = Math.floor(rng() * ENEMY_DIRS.length);
+                if (chaseNoise && state.rng() < chaseNoise) {
+                    e.dir = Math.floor(state.rng() * ENEMY_DIRS.length);
                 } else {
                     let bestDir = e.dir;
                     let bestDist = Infinity;
@@ -690,8 +702,8 @@
                     }
                     e.dir = bestDir;
                 }
-            } else if (rng() < RANDOM_DIR_CHANGE_CHANCE) {
-                e.dir = Math.floor(rng() * ENEMY_DIRS.length);
+            } else if (state.rng() < RANDOM_DIR_CHANGE_CHANCE) {
+                e.dir = Math.floor(state.rng() * ENEMY_DIRS.length);
             }
             const [dx, dy] = ENEMY_DIRS[e.dir];
             let nx = e.x + dx;
@@ -700,17 +712,17 @@
                 const nx2 = e.x + dx * 2;
                 const ny2 = e.y + dy * 2;
                 if (nx2 >= e.minX && nx2 <= e.maxX && ny2 >= e.minY && ny2 <= e.maxY &&
-                    canPlaceEnemy(state, state.enemies, state.enemies.indexOf(e), {...e, x: nx2, y: ny2})) {
+                    canPlaceEnemy(state.shelterSet, state.enemies, ei, {...e, x: nx2, y: ny2})) {
                     nx = nx2;
                     ny = ny2;
                 }
             }
             if (nx >= e.minX && nx <= e.maxX && ny >= e.minY && ny <= e.maxY &&
-                canPlaceEnemy(state, state.enemies, state.enemies.indexOf(e), {...e, x: nx, y: ny})) {
+                canPlaceEnemy(state.shelterSet, state.enemies, ei, {...e, x: nx, y: ny})) {
                 e.x = nx;
                 e.y = ny;
             } else {
-                e.dir = Math.floor(rng() * ENEMY_DIRS.length);
+                e.dir = Math.floor(state.rng() * ENEMY_DIRS.length);
             }
         }
         checkEnemyCollisions(state);
@@ -719,15 +731,15 @@
         }
     }
 
-    function respawnEnemy(state, enemy) {
+    function respawnEnemy(state, enemy, idx) {
         const candidates = [];
         const m = state.maze;
-        const idx = state.enemies.indexOf(enemy);
+        const eidx = (idx === undefined) ? state.enemies.indexOf(enemy) : idx;
         for (let y = enemy.minY; y <= enemy.maxY; y++) {
             for (let x = enemy.minX; x <= enemy.maxX; x++) {
                 if (m.grid[y * m.w + x] !== PATH) continue;
                 const candidate = {...enemy, x, y, inactiveUntil: 0};
-                if (!canPlaceEnemy(state, state.enemies, idx, candidate)) continue;
+                if (!canPlaceEnemy(state.shelterSet, state.enemies, eidx, candidate)) continue;
                 candidates.push({x, y, dist: Math.abs(x - state.px) + Math.abs(y - state.py)});
             }
         }
@@ -736,10 +748,10 @@
             return;
         }
         candidates.sort((a, b) => b.dist - a.dist);
-        const pick = candidates[Math.floor(rng() * Math.min(8, candidates.length))];
+        const pick = candidates[Math.floor(state.rng() * Math.min(8, candidates.length))];
         enemy.x = pick.x;
         enemy.y = pick.y;
-        enemy.dir = Math.floor(rng() * ENEMY_DIRS.length);
+        enemy.dir = Math.floor(state.rng() * ENEMY_DIRS.length);
         enemy.ticks = 0;
         enemy.inactiveUntil = 0;
     }
@@ -813,8 +825,8 @@
         for (const key of state.keys) {
             if (!key.collected && key.x === state.px && key.y === state.py) {
                 key.collected = true;
-                if (state.revealed[key.y][key.x] === PERMA_VISIBLE) {
-                    state.revealed[key.y][key.x] = state.moveCount;
+                if (state.revealed[key.y * state.maze.w + key.x] === PERMA_VISIBLE) {
+                    state.revealed[key.y * state.maze.w + key.x] = state.moveCount;
                 }
                 state.collectedKeys++;
                 return true;
@@ -824,16 +836,7 @@
     }
 
     function revealArea(state, cx, cy, r) {
-        const m = state.maze;
-        for (let dy = -r; dy <= r; dy++) {
-            for (let dx = -r; dx <= r; dx++) {
-                const nx = cx + dx;
-                const ny = cy + dy;
-                if (nx >= 0 && nx < m.w && ny >= 0 && ny < m.h) {
-                    revealCell(state, nx, ny);
-                }
-            }
-        }
+        revealSquare(state, cx, cy, r, false);
     }
 
     function dropFootprint(state) {
@@ -890,6 +893,7 @@
 
     // ─── DOM Refs ────────────────────────────────────────────────────────────
     const $ = (s) => document.querySelector(s);
+    const $$ = (s) => document.querySelectorAll(s);
     const appEl = $('.app');
     const gameAreaEl = $('.game-area');
     const mazeEl = $('#maze');
@@ -1006,9 +1010,14 @@
         document.body.classList.toggle('is-paused', paused);
     }
 
+    let cachedCellSize = null;
     function cellSize() {
-        return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
+        if (cachedCellSize === null) {
+            cachedCellSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
+        }
+        return cachedCellSize;
     }
+    function invalidateCellSize() { cachedCellSize = null; }
 
     function gameElapsed() {
         if (!state || !state.timerStarted) return 0;
@@ -1034,10 +1043,14 @@
     }
 
     // Cache for setStatHTML — avoids re-parsing the same HTML every frame.
-    const statHtmlCache = Object.create(null);
+    // WeakMap keyed by the element itself: a DOM node is NOT a valid plain
+    // object key (it stringifies to "[object HTMLSpanElement]"), so a regular
+    // object cache would collapse all stat elements into one slot and defeat
+    // the optimization.
+    const statHtmlCache = new WeakMap();
     function setStatHTML(el, html) {
-        if (statHtmlCache[el] === html) return;
-        statHtmlCache[el] = html;
+        if (statHtmlCache.get(el) === html) return;
+        statHtmlCache.set(el, html);
         el.innerHTML = html;
     }
 
@@ -1061,9 +1074,10 @@
     }
 
     function setCellClass(y, x, className) {
-        if (state.cellClasses[y][x] !== className) {
-            state.cellClasses[y][x] = className;
-            state.cells[y][x].className = className;
+        const i = y * state.maze.w + x;
+        if (state.cellClasses[i] !== className) {
+            state.cellClasses[i] = className;
+            state.cells[i].className = className;
         }
     }
 
@@ -1225,7 +1239,7 @@
         ctx.strokeRect(exitX - 2.5, exitY - 2.5, 5, 5);
         ctx.fillStyle = '#ffff00';
         for (const key of state.keys) {
-            if (key.collected || state.revealed[key.y][key.x] !== PERMA_VISIBLE) continue;
+            if (key.collected || state.revealed[key.y * state.maze.w + key.x] !== PERMA_VISIBLE) continue;
             const keyX = ox + Math.round((key.x + 0.5) * scale);
             const keyY = oy + Math.round((key.y + 0.5) * scale);
             ctx.fillRect(keyX - 2, keyY - 2, 4, 4);
@@ -1299,12 +1313,6 @@
         });
     }
 
-    function scoreInsertIndex(level, entry) {
-        if (entry.score <= 0) return -1;
-        const rows = sortScoreRows([...(scoreTables[level] || []), entry]).slice(0, SCORE_LIMIT);
-        return rows.indexOf(entry);
-    }
-
     function formatScore(value) {
         return String(value).padStart(4, '0');
     }
@@ -1316,7 +1324,7 @@
     }
 
     function renderScoreTabs() {
-        document.querySelectorAll('[data-score-tab]').forEach(btn => {
+        $$('[data-score-tab]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.scoreTab === activeScoreTab);
         });
     }
@@ -1471,13 +1479,13 @@
             date: new Date().toISOString(),
             result,
         };
-        const index = scoreInsertIndex(level, entry);
-        if (index >= 0) {
+        if (entry.score <= 0) {
+            pendingScoreEntry = null;
+        } else {
             const rows = sortScoreRows([...(scoreTables[level] || []), entry]).slice(0, SCORE_LIMIT);
+            const index = rows.indexOf(entry);
             scoreTables[level] = rows;
             pendingScoreEntry = {level, index, entry, name: ''};
-        } else {
-            pendingScoreEntry = null;
         }
         showScores(level);
     }
@@ -1485,25 +1493,25 @@
     // ─── Build & Render ──────────────────────────────────────────────────────
     function buildGrid() {
         mazeEl.innerHTML = '';
+        mazeEl.classList.remove('is-replay');
         const cs = cellSize();
         const m = state.maze;
         mazeEl.style.gridTemplateColumns = `repeat(${m.w}, ${cs}px)`;
         mazeEl.style.gridTemplateRows = `repeat(${m.h}, ${cs}px)`;
-        state.cells = [];
-        state.cellClasses = [];
+        state.cells = new Array(m.w * m.h);
+        state.cellClasses = new Array(m.w * m.h);
         state.containerTransform = '';
         state.playerTransform = '';
         state.enemyTransforms = [];
         for (let y = 0; y < m.h; y++) {
-            state.cells[y] = [];
-            state.cellClasses[y] = [];
             for (let x = 0; x < m.w; x++) {
+                const i = y * m.w + x;
                 const cell = document.createElement('div');
                 const className = 'cell cell-fog';
                 cell.className = className;
                 mazeEl.appendChild(cell);
-                state.cells[y][x] = cell;
-                state.cellClasses[y][x] = className;
+                state.cells[i] = cell;
+                state.cellClasses[i] = className;
             }
         }
 
@@ -1584,10 +1592,11 @@
             for (let x = 0; x < m.w; x++) {
                 const pos = x + ',' + y;
                 const key = keyMap[pos];
-                const scannedKey = key && state.revealed[y][x] === PERMA_VISIBLE;
+                const i = y * m.w + x;
+                const scannedKey = key && state.revealed[i] === PERMA_VISIBLE;
                 let cls = 'cell ';
 
-                if (!visible[y][x]) {
+                if (!visible[i]) {
                     setCellClass(y, x, cls + 'cell-fog');
                     continue;
                 }
@@ -1605,7 +1614,7 @@
                     cls += 'cell-start';
                 } else if (key) {
                     cls += 'cell-key';
-                    if (scannedKey && !visible[y][x]) cls += ' cell-key-scan';
+                    if (scannedKey && !visible[i]) cls += ' cell-key-scan';
                 } else if (pu) {
                     cls += 'cell-powerup-' + pu;
                 } else if (torch) {
@@ -1716,6 +1725,7 @@
             state.replayKeys = null;
         }
         playerEl.classList.remove('is-replay-hidden');
+        mazeEl.classList.remove('is-replay');
     }
 
     function finishShortTrack() {
@@ -1728,6 +1738,7 @@
         state.replayKeys = null;
         if (trackRunnerEl) trackRunnerEl.classList.add('hidden');
         playerEl.classList.remove('is-replay-hidden');
+        mazeEl.classList.remove('is-replay');
         renderMaze();
     }
 
@@ -1802,17 +1813,23 @@
         setText(winVisited, state.visited.size + '/' + countWalkableCells());
     }
 
+    function markReplayKeysCollected(state, x, y) {
+        if (!state.replayKeys) return;
+        for (const k of state.replayKeys) {
+            if (!k.collected && k.x === x && k.y === y) k.collected = true;
+        }
+    }
+
     function showShortTrack() {
         if (!state || !state.won) return;
         stopShortTrack();
         const route = buildShortTrackRoute();
         if (!route.length) return;
-        resetReplayVisibility(state);
-        // Clear the player's actual playthrough overlay so the ghost runs over
-        // clean cells: no leftover visited dots, footprints, or powerups/torches.
-        // Keys are rendered separately via replayKeys and are not touched here.
-        // Safe because the run is already over (finalScoreApplied) and the next
-        // game builds a fresh state.
+        // Replay shows the whole maze opened (no incremental fog), with all keys
+        // visible; the ghost runner traces the short path and collects keys as
+        // it steps onto them.
+        state.revealed.fill(PERMA_VISIBLE);
+        state.revealVersion++;
         state.visited.clear();
         state.footprints.clear();
         state.powerups.length = 0;
@@ -1822,10 +1839,11 @@
         winOverlay.classList.add('hidden');
         setPaused(true);
         playerEl.classList.add('is-replay-hidden');
+        mazeEl.classList.add('is-replay');
         renderMaze();
         trackRunnerEl.classList.remove('hidden');
         let index = 0;
-        revealAroundPermanent(state, route[index].x, route[index].y);
+        markReplayKeysCollected(state, route[index].x, route[index].y);
         renderMaze();
         setTrackRunnerPosition(route[index]);
         shortTrackTimer = setInterval(() => {
@@ -1834,7 +1852,7 @@
                 finishShortTrack();
                 return;
             }
-            revealAroundPermanent(state, route[index].x, route[index].y);
+            markReplayKeysCollected(state, route[index].x, route[index].y);
             renderMaze();
             setTrackRunnerPosition(route[index]);
         }, SHORT_TRACK_INTERVAL);
@@ -1857,7 +1875,7 @@
         const staleRevealedCells = [];
         for (let y = 0; y < state.maze.h; y++) {
             for (let x = 0; x < state.maze.w; x++) {
-                const revealedAt = state.revealed[y][x];
+                const revealedAt = state.revealed[y * state.maze.w + x];
                 if (revealedAt === PERMA_VISIBLE) {
                     permanentCells.push({x, y, ch: state.maze.grid[y * state.maze.w + x]});
                 } else if (revealedAt >= 0) {
@@ -1904,8 +1922,10 @@
             visibility: {
                 forgetThreshold: FORGET_THRESHOLD,
                 permaVisible: PERMA_VISIBLE,
-                revealed: state.revealed.map(row => row.slice()),
-                visible: state.visible.map(row => row.slice()),
+                revealed: Array.from({length: state.maze.h}, (_, y) =>
+                    state.revealed.slice(y * state.maze.w, y * state.maze.w + state.maze.w)),
+                visible: Array.from({length: state.maze.h}, (_, y) =>
+                    state.visible.slice(y * state.maze.w, y * state.maze.w + state.maze.w)),
             },
             visibilitySummary: {
                 permanentCells,
@@ -1998,10 +2018,11 @@
         setPaused(false);
         currentSeed = seed.trim ? seed.trim().toUpperCase() : String(seed).toUpperCase();
         if (!currentSeed) currentSeed = makeSeed();
-        rng = createRng(currentSeed);
-        state = createGame(width, height);
+        const rng = createRng(currentSeed);
+        state = createGame(width, height, rng);
         inputSeed.value = currentSeed;
         stopTimer();
+        setText(timerEl, '0:00');
         buildGrid();
         renderMaze();
         startTick();
@@ -2020,13 +2041,16 @@
         try {
             tickEffects(state);
 
-            if (canMove(state, dx, dy)) {
+            const moved = canMove(state, dx, dy);
+            let keyCollected = false;
+            let pu = null;
+            if (moved) {
                 state.px += dx;
                 state.py += dy;
                 state.moveCount++;
                 dropFootprint(state);
                 markVisited(state);
-                const keyCollected = collectKey(state);
+                keyCollected = collectKey(state);
                 if (keyCollected) {
                     showCollectPopup('KEY ACQUIRED');
                     sfxCollect();
@@ -2035,20 +2059,11 @@
                         sfxAllKeys();
                     }
                 }
-                const pu = collectPowerup(state);
+                pu = collectPowerup(state);
                 if (pu) {
                     showCollectPopup(pu);
                     if (pu === 'xray') flashScreen();
                     sfxCollect();
-                } else if (!keyCollected) {
-                    // Entering a shelter plays a calm arpeggio instead of the
-                    // step sound; staying inside is silent (edge-triggered).
-                    const inShelterNow = state.shelterSet.has(state.px + ',' + state.py);
-                    if (inShelterNow && !wasInShelter) {
-                        sfxShelter();
-                    } else {
-                        sfxStep();
-                    }
                 }
                 revealAround(state, state.px, state.py);
                 const m = state.maze;
@@ -2057,8 +2072,15 @@
                     else showCollectPopup('KEYS REQUIRED');
                 }
             }
-            // Track shelter occupancy for the edge-triggered enter sound.
-            wasInShelter = state.shelterSet.has(state.px + ',' + state.py);
+
+            // Edge-triggered shelter-enter sound: compute occupancy once and
+            // reuse it both for the sound check and for next-move tracking.
+            const inShelterNow = state.shelterSet.has(state.px + ',' + state.py);
+            if (moved && !pu && !keyCollected) {
+                if (inShelterNow && !wasInShelter) sfxShelter();
+                else sfxStep();
+            }
+            wasInShelter = inShelterNow;
 
             checkEnemyCollisions(state);
             renderMaze();
@@ -2108,7 +2130,7 @@
         }
     }
 
-    const keyMap = {
+    const MOVE_KEYS = {
         ArrowUp: [0, -1], KeyW: [0, -1],
         ArrowDown: [0, 1], KeyS: [0, 1],
         ArrowLeft: [-1, 0], KeyA: [-1, 0],
@@ -2117,7 +2139,7 @@
 
     function trapFocus(e) {
         if (e.key !== 'Tab') return;
-        const modal = document.querySelector('.modal:not(.hidden)');
+        const modal = $('.modal:not(.hidden)');
         if (!modal) return;
         const focusable = modal.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])');
         if (!focusable.length) return;
@@ -2200,9 +2222,9 @@
             return;
         }
         if (paused) return;
-        if (e.code in keyMap) {
+        if (e.code in MOVE_KEYS) {
             e.preventDefault();
-            move(...keyMap[e.code]);
+            move(...MOVE_KEYS[e.code]);
         }
     });
 
@@ -2221,7 +2243,7 @@
     // Touch-only action buttons inside Help (N / SPC). They replace the
     // keyboard hints which are unreachable without a physical keyboard.
     // Show difficulty / scores directly; both target functions keep pause on.
-    document.querySelectorAll('.help-action').forEach(btn => {
+    $$('.help-action').forEach(btn => {
         btn.addEventListener('click', () => {
             const action = btn.dataset.action;
             helpModal.classList.add('hidden');
@@ -2251,6 +2273,7 @@
         requestAnimationFrame(() => {
             resizeRafQueued = false;
             if (state) {
+                invalidateCellSize();
                 updateCamera(state);
                 applyPositions();
             }
@@ -2272,7 +2295,7 @@
         }
     });
 
-    document.querySelectorAll('[data-diff]').forEach(btn => {
+    $$('[data-diff]').forEach(btn => {
         btn.addEventListener('click', () => {
             difficulty = btn.dataset.diff;
             const cfg = DIFFICULTY[difficulty];
@@ -2285,7 +2308,7 @@
     const customMazeButton = $('[data-custom-maze]');
     if (customMazeButton) customMazeButton.addEventListener('click', openCustomFromDifficulty);
 
-    document.querySelectorAll('[data-score-tab]').forEach(btn => {
+    $$('[data-score-tab]').forEach(btn => {
         btn.addEventListener('click', () => {
             if (pendingScoreEntry) return;
             activeScoreTab = btn.dataset.scoreTab;
@@ -2313,7 +2336,7 @@
         if (dpadRepeatTimer) { clearInterval(dpadRepeatTimer); dpadRepeatTimer = null; }
     }
 
-    document.querySelectorAll('.dpad-btn[data-dx]').forEach(btn => {
+    $$('.dpad-btn[data-dx]').forEach(btn => {
         const dx = parseInt(btn.dataset.dx, 10);
         const dy = parseInt(btn.dataset.dy, 10);
 

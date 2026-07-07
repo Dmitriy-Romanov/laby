@@ -4,6 +4,11 @@ Pure static web game (no backend, no build step). Open `index.html` in a browser
 
 ## What's new
 
+### v1.32
+- **Short-track replay rework.** After winning, the optimal-route replay now opens the whole maze with all keys visible, and the ghost "collects" keys as it steps onto them — so a picked-up key becomes a plain cell instead of leaving a stray dot. The replay no longer shows the leftover visited dots of the real run.
+- **Timer resets on new game.** Starting a new game immediately shows `0:00` instead of the previous run's elapsed time.
+- Internal cleanups only (no gameplay change): flat 1D grid storage for `revealed`/`visible`/`cells`/`cellClasses`, deterministic RNG threaded through generation/placement instead of a global, cached `computeVisible` result, cached `--cell-size`, and removal of dead code.
+
 ### v1.31
 - **Name entry on touch.** High-score name entry now uses a real text field on touch devices, so the on-screen keyboard actually opens. Previously the entry was a non-focusable span rewritten by keydown — which silently saved "PLAYER" on phones because no keyboard could appear. Desktop entry is unchanged.
 
@@ -81,7 +86,7 @@ Then open `http://127.0.0.1:8765/`.
 
 ### Rendering (`buildGrid`, `renderMaze`)
 
-- `buildGrid()`: creates all cell `<div>` elements once, stores in `state.cells[y][x]`
+- `buildGrid()`: creates all cell `<div>` elements once, stored in a flat `state.cells` array (index `y * w + x`)
 - `renderMaze()`: computes cell state each frame, but writes `className` only when a cell actually changes
 - Enemies are created dynamically in `buildGrid()`, stored in `enemyEls[]`
 - Container/player/enemy transforms are cached to avoid duplicate style writes
@@ -104,7 +109,7 @@ enemies[]   — {type, size, x, y, dir, ticks, chaseEvery, minX, maxX, minY, max
 keys[]      — {x, y, collected}
 powerups[]  — {x, y, type}
 effects     — {vision: N, freeze: N, away: N}
-revealed[][] — moveCount when each cell was last revealed (-1 = never, -2 = permanent)
+revealed[] — flat 1D array (index y*w+x); value is the moveCount when each cell was last revealed (-1 = never, -2 = permanent)
 footprints  — Set of "x,y" strings
 visited     — Set of "x,y" strings
 score, lives, moveCount, won, dead, totalKeys, collectedKeys, totalPowerups, collectedPowerups
@@ -302,7 +307,7 @@ The game renders these files directly at their tile size: 36x36 for 1-cell objec
 ## Performance notes
 
 - `renderMaze()` avoids duplicate `className` writes through `state.cellClasses`
-- `visible[][]` is reused instead of allocated on every render
+- `visible[]` (flat 1D) is reused instead of allocated on every render
 - Camera/player/enemy transforms are cached before style writes
 - Hidden `P` overlay measures `renderMaze`, `computeVisible`, `tickEnemies`, and `buildShortTrackRoute` when enabled
 - Paused states add `.is-paused` to both `.app` and `body`
